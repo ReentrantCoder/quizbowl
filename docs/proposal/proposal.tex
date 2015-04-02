@@ -116,7 +116,7 @@ Observing that Q is a vector of words, we arrive at our final form:
 \begin{split}
 & Y^* = \underset{n}{\argmax} \ \Prob{A = \text{ Correct } \lvert Q, C, P, N = n} \\
 & X^* = \underset{n}{\argmax} \ \Prob{A = \text{ Incorrect } \lvert Q, C, P, N = n} \\
-& \text{If } Y^* < X^* \text{ we will return } Y^* \text{, otherwise we will return } X^*.
+& \text{If } Y^* < X^* \text{ we will return } Y^* \text{, otherwise we will return } -X^*.
 \end{split}
 \end{equation*}
 
