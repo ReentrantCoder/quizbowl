@@ -71,20 +71,67 @@
 
 \maketitle
 
-\section*{Problem}
-
 \section*{Team Members}
 
+\paragraph{} Our team consists of Alex Gendreau, Garrett Lewellen, and Tyler Behm.
+
+\section*{Problem}
+
+\paragraph{} Contestants in a quiz bowl are asked to answer trivia questions in order to accrue points. Given that one of the contestants is an artificial agent, we'd like the agent to buzz in with a correct answer before the other contestants. To make the agent more interesting, it will attempt to buzz in just a moment before other contestants are expected to buzz in. To achieve this behavior, we will need to address two problems:
+
+\begin{enumerate}
+	\item How many words it takes a player to answer the question.
+	\item Decide whether a player gets the question right or wrong.
+\end{enumerate}
+
+\section*{Approach}
+
+\paragraph{} We believe that we can achieve the desired behavior by modeling the conditional probability that a question will be answered correctly or incorrectly, $A$, given context consisting of the first $N$ individual words of the question, $Q$, the category of the question, $C$, and the person with the buzzer, $P$. Assuming that the correctness of the answer and time before the answer is given is highly correlated with the actual person with the buzzer, we intend to have individual-level models:
+
+\begin{equation*}
+\Prob{A \lvert Q, C, N}_P \propto \Prob{Q, C, N \lvert A}_P \Prob{A}_P
+\end{equation*}
+
+Assuming that the first $N$ words, category and, number of words read are independent, we simplify further to:
+
+\begin{equation*}
+\Prob{A \lvert Q, C, N}_P \propto \Prob{Q\lvert A}_P \Prob{C \lvert A}_P \Prob{N \lvert A}_P \Prob{A}_P
+\end{equation*}
+
+Observing that Q is a vector of words, we arrive at our final form:
+
+% By bayes rule we drop the P(A) and we can ignore the P(Q) since it will be constant when evaluating different values of n
+
+\begin{equation*}
+\Prob{A \lvert Q, C, N}_P \propto \Prob{A \lvert Q}_P \Prob{C \lvert A}_P \Prob{N \lvert A}_P
+\end{equation*}
+
 \section*{Proposed Work}
+
+\paragraph{} Computationally, we will solve the problem by using a machine learning technique discussed over the course of the semester to model each probability of the model.  For each contestant we will capture $\Prob{A \lvert Q}_P$ using logistic regression, $\Prob{C \lvert A}_P$ and $\Prob{N \lvert A}_P$ by maximum likelihood estimation.
+
+\paragraph{} Given our machinery, we would then address the problem statement through the following pseudo-code:
+
+\begin{equation*}
+\begin{split}
+& Y^* = \underset{n}{\argmax} \ \Prob{A = \text{ Correct } \lvert Q, C, P, N = n} \\
+& X^* = \underset{n}{\argmax} \ \Prob{A = \text{ Incorrect } \lvert Q, C, P, N = n} \\
+& \text{If } Y^* < X^* \text{ we will return } Y^* \text{, otherwise we will return } X^*.
+\end{split}
+\end{equation*}
+
+\section*{Possible Limitations}
+
+\paragraph{} Having an individual model may not work well for users who have never answered a question before, or have only answered a few questions. We have discussed different techniques to address this issue, e.g., clustering common users together and user stereotype-level models instead, but are still examining our options.
 
 \section*{Deliverables}
 
 \begin{description}
 \item[April 3\textsuperscript{th}, 2015] Project proposal explaining problem and proposed solution.
 
-\item[April 9\textsuperscript{th}, 2015] First deliverable - proof of concept
+\item[April 9\textsuperscript{th}, 2015] First deliverable - proof of concept. We hope to have the basic implementation up and running, with initial results to present.
 
-\item[May 6\textsuperscript{th}, 2014] Completed project and Presentation
+\item[May 6\textsuperscript{th}, 2014] Completed project and Presentation. We will present our approach and results, and discuss any challenges we encountered and how we overcame them.
 
 \end{description}
 
