@@ -17,6 +17,8 @@ import operator
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+from data import Dataset
+from fileFormats import TrainFormat, TestFormat, QuestionFormat
 
 kTAGSET = ["", "Ast", "Bio", "Che", "Ear", "Fin", "Geo", "His", "Lit", "Mat", "Oth", "Phy", "Sci", "SSc", "SSt" ]
                 
@@ -70,10 +72,12 @@ def accuracy(classifier, x, y, examples):
         print("\t".join(str(x) for x in ii))   
 
 if __name__ == "__main__":
+    dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
+    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv")
 
-    # Cast to list to keep it all in memory
-    train = list(DictReader(open("train.csv", 'r')))
-    test = list(DictReader(open("test.csv", 'r')))
+#     # Cast to list to keep it all in memory
+#     train = list(DictReader(open("train.csv", 'r')))
+#     test = list(DictReader(open("test.csv", 'r')))
 
     feat = Featurizer()
 
