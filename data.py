@@ -1,3 +1,5 @@
+from models import User
+
 class TestData:
     def __init__(self):
         self.questionId = None
@@ -10,6 +12,7 @@ class TrainingData(TestData):
     def __init__(self):
         self.userAnswer = None
         self.position = None
+
 
 class Dataset:
     def __init__(self, trainFormat, testFormat, questionFormat):
@@ -42,7 +45,7 @@ class Dataset:
             if questionId not in Q:
                 continue
 
-            data = TrainingData()
+            data = TestData()
             data.questionId = t["question"]
             data.questionCategory = Q[data.questionId]["category"]
             data.questionText = Q[data.questionId]["question"]
@@ -51,3 +54,20 @@ class Dataset:
             test.append(data)
         
         return (train, test)
+    
+    def groupByUser(self, (train, test)):
+        U = {}
+
+        for x in train:
+            if not x.userId in U:
+                U[x.userId] = User(x.userId);
+            
+            U[x.userId].train.append(x)
+        
+        for x in test:
+            if not x.userId in U:
+                U[x.userId] = User(x.userId);
+            
+            U[x.userId].test.append(x)
+
+        return U
