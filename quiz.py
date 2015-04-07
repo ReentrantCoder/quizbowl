@@ -3,6 +3,8 @@ from csv import DictReader, DictWriter
 import numpy as np
 from numpy import array
 
+import math
+
 import random
 
 from sklearn.feature_extraction.text import CountVectorizer
@@ -113,11 +115,19 @@ def isCorrect(datum):
     userAnswer, questionAnswer = datum.userAnswer.lower(), datum.questionAnswer.lower()
     return userAnswer in questionAnswer
         
-def accuracy(classifier, x, y, examples):
-    # Input model, data, actual label, and label names
-    # Output print confusion matrix and accuracy percent as side-effect
+def rms_train(userModels):
+    # Input user models, users
+    # Output root-mean-square score
+     
+    n = 0   
+    for (userId, model) in userModels:
+        for x in model.user.train:
+            actual = x.position
+            prediction = model.getExpectedPosition(x)
+            squareSum += (prediction - actual)*(prediction - actual)
+            n += 1
+    return math.sqrt(squareSum/float(n))
     
-    pass
 
 if __name__ == "__main__":
     featurizer = Featurizer()
@@ -132,6 +142,8 @@ if __name__ == "__main__":
             guesses.append( { 'id': x.questionId, 'position': model.getExpectedPosition(x) } )
     
     guessFormat.serialize(guesses, "guesses.csv")
+    
+    print "Training set RMS score is ", rms_train(userModels)
 
 #     # Cast to list to keep it all in memory
 #     train = list(DictReader(open("train.csv", 'r')))
