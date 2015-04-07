@@ -1,5 +1,6 @@
 from sklearn.linear_model.stochastic_gradient import SGDClassifier
 from sklearn.neighbors.kde import KernelDensity
+from sklearn.dummy.DummyClassifier import DummyClassifier
 import math
 
 class User:
@@ -13,9 +14,13 @@ class OriginalModel:
         self.user = user
         self.featurizer = featurizer
 
-        # P(A | Q)        
-        self.probAGivenQ = SGDClassifier()
-        self.probAGivenQ.fit(featurizer.getX(user.train), featurizer.getY(user.train))
+        # P(A | Q)
+        y = featurizer.getY(user.train) 
+        if True in y and False in y:    
+            self.probAGivenQ = SGDClassifier()
+            self.probAGivenQ.fit(featurizer.getX(user.train), featurizer.getY(user.train))
+        else:
+            self.probAGivenQ = DummyClassifier(strategy='constant', constant=float(y[0]))
 
         # P(N | A = Correct)
         self.probNGivenCorrect =  KernelDensity(kernel='gaussian', bandwidth=1)
@@ -50,7 +55,7 @@ class OriginalModel:
         return (optN, optProb)
 
     def probAGivenQCN(self, boolA, query):
-        # P( A | Q, C, N) = P(A | Q) P(N | A)
+        # P( A | Q, C, N) \propto P(Q | A) P(N | A)
 
         x = self.featurizer.getSingleX(query)
         
