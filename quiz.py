@@ -74,51 +74,63 @@ from models import OriginalModel
 
 class Featurizer:
     def __init__(self):
-        pass
+        self.vectorizer = CountVectorizer(binary=True)
     
     def getX(self, listData):
         # Input a list of TrainData or TestData
         # Output an array of vectors
-
-        pass
+        
+        return self.vectorizer.fit_transform([datum.questionText for datum in listData])
     
     def getSingleX(self, singleData):
         # Input a list of TrainData or TestData
-        # Output a vectors
+        # Output a vector
          
-        pass
+        return self.vectorizer.fit_transform(singleData.questionText)
 
     def getY(self, listData):
         # Input a list of TrainData or TestData
         # Output a vector of Y (isCorrect) values 
     
-        pass
+        return [isCorrect(datum) for datum in listData]
     
     def getN(self, listData, boolA):
         # Input list of TrainData
         # Output array of positions N for only those questions that are isCorrect = boolA
         
-        pass
+        return [datum.position for datum in listData if isCorrect(datum) == boolA]
     
     def getSingleN(self, singleData, boolA):
         # Input list of TrainData
         # Output array of positions N for only those questions that are isCorrect = boolA
-        
-        pass
+            
+        return singleData.position
 
+def isCorrect(datum):
+    # Input datum containing user answer and question answer 
+    # Output true if correct, false otherwise
+    
+    userAnswer, questionAnswer = datum.userAnswer.lower(), datum.questionAnswer.lower()
+    return userAnswer in questionAnswer
+        
+def accuracy(classifier, x, y, examples):
+    # Input model, data, actual label, and label names
+    # Output print confusion matrix and accuracy percent as side-effect
+    
+    pass
 
 if __name__ == "__main__":
     featurizer = Featurizer()
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     users = dataset.groupByUser(dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv"))
-    userModels = { userId : OriginalModel(user, featurizer) for userId, user in users }
+    userModels = { userId : OriginalModel(user, featurizer) for (userId, user) in users.items() }
     
     guessFormat = GuessFormat()
     guesses = []
     for (userId, model) in userModels:
         for x in model.user.test:
             guesses.append( { 'id': x.questionId, 'position': model.getExpectedPosition(x) } )
-
+    
     guessFormat.serialize(guesses, "guesses.csv")
 
 #     # Cast to list to keep it all in memory
