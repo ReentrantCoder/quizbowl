@@ -1,4 +1,6 @@
 from models import User
+from random import shuffle
+from numpy.ma.core import mean
 
 class TestData:
     def __init__(self):
@@ -20,7 +22,7 @@ class Dataset:
         self.testFormat = testFormat
         self.questionFormat = questionFormat
 
-    def getTrainingTest(self, trainFilePath, testFilePath, questionsFilePath):
+    def getTrainingTest(self, trainFilePath, testFilePath, questionsFilePath, limit):
         Q = self.questionFormat.generatorToDict(self.questionFormat.deserialize(questionsFilePath))
         
         train = []
@@ -53,7 +55,21 @@ class Dataset:
             data.userId = t["user"]
             test.append(data)
         
-        return (train, test)
+        return (train[:limit], test[:limit])
+    
+    def crossValidate(self, train, K = 5, f):
+        bucket = len(train)/K
+
+        values = []
+        for k in xrange(0, K):
+            shuffle(train)
+    
+            asTest = train[:bucket]
+            asTrain = train[bucket:]
+            
+            values.append( f(asTrain, asTest) )
+        
+        return mean(values)
     
     def groupByUser(self, (train, test)):
         U = {}

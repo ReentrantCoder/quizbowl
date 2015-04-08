@@ -21,7 +21,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from data import Dataset
 from fileFormats import TrainFormat, TestFormat, QuestionFormat, GuessFormat
-from models import OriginalModel
+from models import OriginalModel, User
 
 # kTAGSET = ["", "Ast", "Bio", "Che", "Ear", "Fin", "Geo", "His", "Lit", "Mat", "Oth", "Phy", "Sci", "SSc", "SSt" ]
 #                 
@@ -74,6 +74,8 @@ from models import OriginalModel
 #     for ii in cm:
 #         print("\t".join(str(x) for x in ii))   
 
+
+
 class Featurizer:
     def __init__(self):
         self.vectorizer = CountVectorizer(binary=True)
@@ -88,7 +90,7 @@ class Featurizer:
         # Input a list of TrainData or TestData
         # Output a vector
          
-        return self.vectorizer.fit_transform(singleData.questionText)
+        return self.vectorizer.transform([singleData.questionText])
 
     def getY(self, listData):
         # Input a list of TrainData or TestData
@@ -111,39 +113,68 @@ class Featurizer:
 def isCorrect(datum):
     # Input datum containing user answer and question answer 
     # Output true if correct, false otherwise
-    
+
+    # Case shouldn't factor into correctness
     userAnswer, questionAnswer = datum.userAnswer.lower(), datum.questionAnswer.lower()
-    return userAnswer in questionAnswer
+
+    # An answer should still be equal if its off by punctuation: 
+    #  e.g., mary's house == marys house
+    #  e.g., key board == keyboard
+    regex = re.compile("[^\w\s]|\s")
+    userAnswer = re.sub(regex, "", userAnswer)
+    questionAnswer = re.sub(regex, "", questionAnswer)
+
+    # User could be vauge, but correct, or overly specific, or implicitly, match identically
+    return (userAnswer in questionAnswer) or (questionAnswer in userAnswer)
         
 def rms_train(userModels):
     # Input user models, users
     # Output root-mean-square score
      
-    n = 0   
-    for (userId, model) in userModels:
+    n = 0.0
+    squareSum = 0.0
+    for userId in userModels:
+        model = userModels[userId]
+        
         for x in model.user.train:
-            actual = x.position
+            actual = float(x.position)
             prediction = model.getExpectedPosition(x)
-            squareSum += (prediction - actual)*(prediction - actual)
-            n += 1
-    return math.sqrt(squareSum/float(n))
-    
+            squareSum += (prediction - actual) * (prediction - actual)
+            n += 1.0
 
-if __name__ == "__main__":
-    featurizer = Featurizer()
-    dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
-    users = dataset.groupByUser(dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv"))
-    userModels = { userId : OriginalModel(user, featurizer) for (userId, user) in users.items() }
-    
-    guessFormat = GuessFormat()
+    return math.sqrt(squareSum/n)
+
+def writeGuesses(userModels):
     guesses = []
-    for (userId, model) in userModels:
+    for userId in userModels:
+        model = userModels[userId]
         for x in model.user.test:
             guesses.append( { 'id': x.questionId, 'position': model.getExpectedPosition(x) } )
-    
+     
+    guessFormat = GuessFormat()
     guessFormat.serialize(guesses, "guesses.csv")
+
+def asSingleUser(train, test):
+    user = User(0)
+    user.test = test
+    user.train = train
+    return { 0: OriginalModel(user, Featurizer()) }
+
+def asManyUsers(train, test):
+    users = dataset.groupByUser((train, test))
+    return { userId : OriginalModel(user, Featurizer()) for (userId, user) in users.items() }
+
+if __name__ == "__main__":
+    dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
+    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", 500)
     
-    print "Training set RMS score is ", rms_train(userModels)
+    ## Uncomment this section for a user independent model
+    userModels = asSingleUser(train, test)
+
+    ## Uncomment for user dependent models
+    #userModels = asManyUsers(train, test)
+
+    print("Training set RMS score is %f" % rms_train(userModels))
 
 #     # Cast to list to keep it all in memory
 #     train = list(DictReader(open("train.csv", 'r')))

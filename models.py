@@ -1,7 +1,11 @@
-from sklearn.linear_model.stochastic_gradient import SGDClassifier
-from sklearn.neighbors.kde import KernelDensity
-from sklearn.dummy.DummyClassifier import DummyClassifier
 import math
+from string import split
+
+from numpy.core.fromnumeric import reshape
+
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model.logistic import LogisticRegression
+from sklearn.neighbors.kde import KernelDensity
 
 class User:
     def __init__(self, userId):
@@ -17,18 +21,33 @@ class OriginalModel:
         # P(A | Q)
         y = featurizer.getY(user.train) 
         if True in y and False in y:    
-            self.probAGivenQ = SGDClassifier()
-            self.probAGivenQ.fit(featurizer.getX(user.train), featurizer.getY(user.train))
-        else:
+            self.probAGivenQ = LogisticRegression()
+            self.probAGivenQ.fit(featurizer.getX(user.train), y)
+        elif len(y) > 0:
             self.probAGivenQ = DummyClassifier(strategy='constant', constant=float(y[0]))
+        else:
+            self.probAGivenQ = DummyClassifier(strategy='constant', constant=0)
+            
 
         # P(N | A = Correct)
-        self.probNGivenCorrect =  KernelDensity(kernel='gaussian', bandwidth=1)
-        self.probNGivenCorrect.fit(featurizer.getN(user.train, True))
+        NC = featurizer.getN(user.train, True)
+        NC = reshape(NC, (len(NC), 1))
         
+        if len(NC) > 0:
+            self.probNGivenCorrect =  KernelDensity(kernel='gaussian', bandwidth=1)
+            self.probNGivenCorrect.fit(NC)
+        else:
+            self.probNGivenCorrect = DummyClassifier(strategy='constant', constant = 1)
+            
         # P(N | A = Incorrect)
-        self.probNGivenIncorrect = KernelDensity(kernel='gaussian', bandwidth=1)
-        self.probNGivenIncorrect.fit(featurizer.getN(user.train, False))
+        NI = featurizer.getN(user.train, False)
+        NI = reshape(NI, (len(NI), 1))
+        
+        if len(NI) > 0:
+            self.probNGivenIncorrect = KernelDensity(kernel='gaussian', bandwidth=1)
+            self.probNGivenIncorrect.fit(NI)
+        else:
+            self.probNGivenIncorrect = DummyClassifier(strategy='constant', constant = 0)
 
     def getExpectedPosition(self, query):
         # how to make use of yp and xp?
@@ -44,7 +63,9 @@ class OriginalModel:
         optProb = float("-inf")
         optN = None
         
-        for n in xrange(0, 100):
+        maxN = len(split(query.questionText))
+        
+        for n in xrange(0, maxN):
             query.position = n
             
             prob = self.probAGivenQCN(boolA, query)
@@ -59,8 +80,9 @@ class OriginalModel:
 
         x = self.featurizer.getSingleX(query)
         
-        probQGivenIncorrect = self.logisticFunc( -(x * self.probAGivenQ.coef_ + self.probAGivenQ.intercept_) )
-        probQGivenCorrect = 1.0 - probQGivenIncorrect
+        lrProbWrongRight = self.probAGivenQ.predict_proba(x)
+        probQGivenIncorrect = lrProbWrongRight[0][0]
+        probQGivenCorrect = lrProbWrongRight[0][1]
 
         kde = self.probNGivenCorrect
         probQGivenA = probQGivenCorrect
