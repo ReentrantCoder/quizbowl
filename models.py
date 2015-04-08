@@ -54,7 +54,7 @@ class OriginalModel:
         (y, yp) = self.argmax(query, True)
         (x, xp) = self.argmax(query, False)
 
-        if y < x:
+        if yp > xp:
             return y
 
         return -x
@@ -63,7 +63,7 @@ class OriginalModel:
         optProb = float("-inf")
         optN = None
         
-        maxN = len(split(query.questionText))
+        maxN = len(query.questionText)
         
         for n in xrange(0, maxN):
             query.position = n

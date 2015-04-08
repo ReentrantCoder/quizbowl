@@ -83,14 +83,14 @@ class Featurizer:
     def getX(self, listData):
         # Input a list of TrainData or TestData
         # Output an array of vectors
-        
-        return self.vectorizer.fit_transform([datum.questionText for datum in listData])
+                
+        return self.vectorizer.fit_transform([ datum.getQuestionFragment() for datum in listData])
     
     def getSingleX(self, singleData):
         # Input a list of TrainData or TestData
         # Output a vector
-         
-        return self.vectorizer.transform([singleData.questionText])
+
+        return self.vectorizer.transform([ singleData.getQuestionFragment() ])
 
     def getY(self, listData):
         # Input a list of TrainData or TestData
