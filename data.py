@@ -5,17 +5,13 @@ import ast
 
 class TestData:
     def __init__(self):
+        self.id = None
         self.questionId = None
         self.questionCategory = None
         self.questionText = None
         #self.questionWords = None
         self.questionAnswer = None
         self.userId = None
-
-class TrainingData(TestData):
-    def __init__(self):
-        self.userAnswer = None
-        self.position = None
 
     def getQuestionFragment(self):
         questionFragment = ""
@@ -26,6 +22,12 @@ class TrainingData(TestData):
             return self.questionText
         
         return self.questionText[:self.position]
+
+class TrainingData(TestData):
+    def __init__(self):
+        self.userAnswer = None
+        self.position = None
+
 
 class Dataset:
     def __init__(self, trainFormat, testFormat, questionFormat):
@@ -43,6 +45,7 @@ class Dataset:
                 continue
             
             data = TrainingData()
+            data.id = t["id"]
             data.questionId = questionId
             data.questionCategory = Q[data.questionId]["category"]
             data.questionText = Q[data.questionId]["question"]
@@ -60,6 +63,7 @@ class Dataset:
                 continue
 
             data = TestData()
+            data.id = t["id"]
             data.questionId = t["question"]
             data.questionCategory = Q[data.questionId]["category"]
             data.questionText = Q[data.questionId]["question"]
@@ -67,6 +71,9 @@ class Dataset:
             #data.questionWords = ast.literal_eval(Q[data.questionId]["blob"])
             data.userId = t["user"]
             test.append(data)
+        
+        if limit < 0:
+            return (train, test)
         
         return (train[:limit], test[:limit])
     

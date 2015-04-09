@@ -144,13 +144,16 @@ def rms_train(userModels):
 
     return math.sqrt(squareSum/n)
 
-def writeGuesses(userModels):
+def writeGuesses(userModels, test):
+    # 2015-04-08 GEL This assumes the user independent model.. will need to 
+    # adjust in future for different approach.
+    model = userModels[0]
+    
     guesses = []
-    for userId in userModels:
-        model = userModels[userId]
-        for x in model.user.test:
-            guesses.append( { 'id': x.questionId, 'position': model.getExpectedPosition(x) } )
-     
+    for testQuestion in test:
+        print testQuestion.id
+        guesses.append( { 'id': testQuestion.id, 'position': model.getExpectedPosition(testQuestion) } )
+
     guessFormat = GuessFormat()
     guessFormat.serialize(guesses, "guesses.csv")
 
@@ -166,7 +169,7 @@ def asManyUsers(train, test):
 
 if __name__ == "__main__":
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
-    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", 500)
+    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
     
     ## Uncomment this section for a user independent model
     userModels = asSingleUser(train, test)
@@ -174,7 +177,9 @@ if __name__ == "__main__":
     ## Uncomment for user dependent models
     #userModels = asManyUsers(train, test)
 
-    print("Training set RMS score is %f" % rms_train(userModels))
+    writeGuesses(userModels, test)
+
+#    print("Training set RMS score is %f" % rms_train(userModels))
 
 #     # Cast to list to keep it all in memory
 #     train = list(DictReader(open("train.csv", 'r')))
