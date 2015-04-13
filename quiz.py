@@ -23,6 +23,26 @@ from data import Dataset
 from fileFormats import TrainFormat, TestFormat, QuestionFormat, GuessFormat
 from models import OriginalModel, User
 
+
+#Simple edit distance computation
+#Cite: http://rosettacode.org/wiki/Levenshtein_distance
+
+def levenshteinDistance(s1,s2):
+    if len(s1) > len(s2):
+        s1,s2 = s2,s1
+    distances = range(len(s1) + 1)
+    for index2,char2 in enumerate(s2):
+        newDistances = [index2+1]
+        for index1,char1 in enumerate(s1):
+            if char1 == char2:
+                newDistances.append(distances[index1])
+            else:
+                newDistances.append(1 + min((distances[index1],
+                                             distances[index1+1],
+                                             newDistances[-1])))
+        distances = newDistances
+    return distances[-1]
+
 # kTAGSET = ["", "Ast", "Bio", "Che", "Ear", "Fin", "Geo", "His", "Lit", "Mat", "Oth", "Phy", "Sci", "SSc", "SSt" ]
 #                 
 # def pars(examples):
@@ -113,7 +133,8 @@ class Featurizer:
 def isCorrect(datum):
     # Input datum containing user answer and question answer 
     # Output true if correct, false otherwise
-
+    # Edit distance is hard coded for now.
+    
     # Case shouldn't factor into correctness
     userAnswer, questionAnswer = datum.userAnswer.lower(), datum.questionAnswer.lower()
 
@@ -123,9 +144,11 @@ def isCorrect(datum):
     regex = re.compile("[^\w\s]|\s")
     userAnswer = re.sub(regex, "", userAnswer)
     questionAnswer = re.sub(regex, "", questionAnswer)
+    #take away slight misspellings 
+    editDistance = levenshteinDistance(userAnswer,questionAnswer)
 
     # User could be vauge, but correct, or overly specific, or implicitly, match identically
-    return (userAnswer in questionAnswer) or (questionAnswer in userAnswer)
+    return (userAnswer in questionAnswer) or (questionAnswer in userAnswer) or editDistance<3
         
 def rms_train(userModels):
     # Input user models, users
@@ -166,16 +189,26 @@ def asSingleUser(train, test):
 def asManyUsers(train, test):
     users = dataset.groupByUser((train, test))
     return { userId : OriginalModel(user, Featurizer()) for (userId, user) in users.items() }
+# Have to incorporate user model
+'''
+def asUserCategory(train,test):
+    users = dataset.groupByCategory((train, test))
+    return { userId : OriginalModel(user, Featurizer()) for (userId, user) in users.items() }
+'''
 
 if __name__ == "__main__":
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
-    
+
     ## Uncomment this section for a user independent model
     userModels = asSingleUser(train, test)
 
     ## Uncomment for user dependent models
     #userModels = asManyUsers(train, test)
+    
+    ## Uncomment for category as user model
+    #have to define
+    #userModels = asUserCategory(train,test)
 
     writeGuesses(userModels, test)
 

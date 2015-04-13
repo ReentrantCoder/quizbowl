@@ -12,6 +12,13 @@ class User:
         self.userId = userId
         self.test = []
         self.train = []
+'''
+class Category:
+    def __init__(self,category):
+        self.category = category
+        self.test = []
+        self.train = []
+'''
 
 class OriginalModel:
     def __init__(self, user, featurizer):
@@ -102,3 +109,5 @@ class OriginalModel:
             return 1.0
 
         return 1.0 / (1.0 + math.exp(-x))
+
+
