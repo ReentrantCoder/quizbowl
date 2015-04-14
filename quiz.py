@@ -113,22 +113,22 @@ class Featurizer:
         return self.vectorizer.transform([ singleData.getQuestionFragment() ])
 
     def getY(self, listData):
-        # Input a list of TrainData or TestData
+        # Input a list of TrainData
         # Output a vector of Y (isCorrect) values 
     
-        return [isCorrect(datum) for datum in listData]
+        return [(float(datum.position) > 0) for datum in listData]
     
     def getN(self, listData, boolA):
         # Input list of TrainData
         # Output array of positions N for only those questions that are isCorrect = boolA
         
-        return [datum.position for datum in listData if isCorrect(datum) == boolA]
+        return [str(abs(float(datum.position))) for datum in listData if ((float(datum.position) > 0) == boolA)]
     
     def getSingleN(self, singleData, boolA):
         # Input list of TrainData
         # Output array of positions N for only those questions that are isCorrect = boolA
             
-        return singleData.position
+        return str(abs(float(singleData.position)))
 
 def isCorrect(datum):
     # Input datum containing user answer and question answer 
@@ -175,6 +175,7 @@ def writeGuesses(userModels, test):
     guesses = []
     for testQuestion in test:
         print testQuestion.id
+        print model.getExpectedPosition(testQuestion)
         guesses.append( { 'id': testQuestion.id, 'position': model.getExpectedPosition(testQuestion) } )
 
     guessFormat = GuessFormat()
