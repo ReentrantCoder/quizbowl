@@ -20,6 +20,7 @@ from sklearn.metrics import accuracy_score
 
 import math
 from numpy.ma.core import mean
+from numpy import sign
 
 def pars(x):
     q = "question" + str(x['question'])
@@ -58,13 +59,13 @@ def crossValidate(train, K = 5):
 def crossLearn(train, test):
 
     feat = Featurizer()
-    labels = ['39.298062750052644', '-39.298062750052644']  
+    labels = ['39.298062750052644', '-39.298062750052644']    
 
     x_train = feat.train_feature(x['question'] for x in train)
     x_test = feat.test_feature(x['question'] for x in test)
 
     y_train = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in train))
-    y_test  = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in test))
+    y_test  = array(list(x['position'] for x in test))
 
     # Train classifier
     lr = SGDClassifier(loss='log', penalty='l2', shuffle=True)
@@ -80,7 +81,7 @@ def rms(classifier, data, actual):
        
     predictions = classifier.predict(data) 
     for (x, y) in zip(predictions, actual):
-        x, y = float(x), float(y)
+        x, y = 20*sign(float(x)), float(y)
         squareSum += (x-y)*(x-y)
         n += 1.0
 

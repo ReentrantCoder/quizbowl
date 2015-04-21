@@ -24,6 +24,35 @@ from sklearn.metrics import accuracy_score
 
 import math
 from numpy.ma.core import mean
+from numpy import sign
+
+catposwrong =  {'Astronomy': -78.77142857,
+            'Biology':	-77.93413174,
+            'Chemistry': -75.8245614,
+            'Earth Science':-77.57142857,
+            'Fine Arts':	-92.69809524,
+            'History':	-87.40901639,
+            'Literature':	-95.17899638,
+            'Mathematics':	-90.54545455,
+            'Other':	-97.32,
+            'Physics': -80.84519573,
+            'Social Studies':	-88.05496183 }
+            
+catposright = { 'Astronomy':	77.33333333,
+                'Biology':	75.45972222,
+                'Chemistry':	75.59920107,
+                'Earth Science':	77.46153846,
+                'Fine Arts':	87.6202765,
+                'History':	85.64456869,
+                'Literature':	91.51880966,
+                'Mathematics':	75.94285714,
+                'Other':	89.55752212,
+                'Physics':	81.92889289,
+                'Social Studies':	84.0219363 }
+
+catpos = { '-1.0': catposwrong, '1.0': catposright }
+
+
 
 #analyzer that determines which features to use
 class Analyzer:
@@ -45,8 +74,6 @@ class Analyzer:
             for w in words:
                 yield w
 
-
-
 #Modified from features.py.  All the possible features of an question
 def example(answer_info, question_info,train=True):
     
@@ -64,10 +91,9 @@ def example(answer_info, question_info,train=True):
 
     #This may be unnecessary if we are always using the average answers instead of the one provided
     if train:
-        target = answer_info['position']
-
+        target = str(sign(float(answer_info['position'])))
     else:
-        target = -1 #unsurpervised, we don't know the info about our test set
+        target = 0 #unsurpervised, we don't know the info about our test set
     
     return qu, target
 
@@ -127,7 +153,7 @@ def crossValidate(train, K = 5):
 def crossLearn(train, test):
     
     feat = Featurizer()
-    labels = ['39.298062750052644', '-39.298062750052644']
+    labels = ['80', '-80']
     
     x_train = feat.train_feature(ex for ex, tgt in
                                  all_examples(train,len(train),question_info,True)) #all the words
@@ -136,9 +162,12 @@ def crossLearn(train, test):
     x_test = feat.test_feature(ex for ex, tgt in
                                all_examples(test,len(train),question_info,False))
                                
-    y_train = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in train))
+    examp = [ex for ex, tgt in
+                               all_examples(test,len(train),question_info,False)]
+                               
+    y_train = array(list(tgt for ex, tgt in all_examples(train[0:flags.limit],flags.limit,question_info,True)))
 
-    y_test  = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in test))
+    y_test  = array(list(x['position'] for x in train))
 
 
     
@@ -146,18 +175,19 @@ def crossLearn(train, test):
     lr = SGDClassifier(loss='log', penalty='l2', shuffle=True)
     lr.fit(x_train, y_train)
     
-    return rms(lr, x_test, y_test)
+    return rms(lr, x_test, examp, y_test)
 
-def rms(classifier, data, actual):
+def rms(classifier, data, ex, actual):
     # Input classifier and training data that was reserved for testing
     # Output root-mean-square score
     
     n, squareSum = 0.0, 0.0
     
     predictions = classifier.predict(data)
-    for (x, y) in zip(predictions, actual):
-        x, y = float(x), float(y)
-        squareSum += (x-y)*(x-y)
+    for (x, d, y) in zip(predictions, ex, actual):
+        c = d[2].replace('category', '')
+        z, y = catpos[x][c], float(y)
+        squareSum += (z-y)*(z-y)
         n += 1.0
     
     return math.sqrt(squareSum/n)
@@ -187,7 +217,7 @@ if __name__ == "__main__":
     
 
     feat = Featurizer()
-    labels = ['39.298062750052644', '-39.298062750052644']  
+    #labels = ['39.298062750052644', '-39.298062750052644']  
     
     x_train = feat.train_feature(ex for ex, tgt in
                                  all_examples(train[0:flags.limit],flags.limit,question_info,True)) #all the words
@@ -196,9 +226,11 @@ if __name__ == "__main__":
     x_test = feat.test_feature(ex for ex, tgt in
                                all_examples(test,flags.limit,question_info,False))
                                
-    y_train = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in train))
+    examp = [ex for ex, tgt in all_examples(test,len(train),question_info,False)]
+                               
+    #y_train = array(list(labels[0] if float(x['position']) > 0 else labels[1] for x in train))
                                  
-    #y_train = array(list(tgt for ex, tgt in all_examples(train[0:flags.limit],flags.limit,question_info,True)))
+    y_train = array(list(tgt for ex, tgt in all_examples(train[0:flags.limit],flags.limit,question_info,True)))
     
     
     # Train classifier
@@ -210,7 +242,9 @@ if __name__ == "__main__":
     predictions = lr.predict(x_test)
     o = DictWriter(open("predictions.csv", 'w'), ["id", "position"])
     o.writeheader()
-    for ii, pp in zip([x['id'] for x in test], predictions):
+    for ii, pp, ee in zip([x['id'] for x in test], predictions, examp):
+        c = ee[2].replace('category', '')
+        pp = catpos[pp][c]
         d = {'id': ii, 'position': pp}
         o.writerow(d)
             
