@@ -153,7 +153,6 @@ def crossValidate(train, K = 5):
 def crossLearn(train, test):
     
     feat = Featurizer()
-    labels = ['80', '-80']
     
     x_train = feat.train_feature(ex for ex, tgt in
                                  all_examples(train,len(train),question_info,True)) #all the words
@@ -181,7 +180,10 @@ def rms(classifier, data, ex, actual):
     # Input classifier and training data that was reserved for testing
     # Output root-mean-square score
     
-    n, squareSum = 0.0, 0.0
+    n, m, squareSum = 0.0, 0.0, 0.0
+    
+    o = DictWriter(open("expectactualsigns.csv", 'w'), ["expected sign", "actual sign"])
+    o.writeheader()
     
     predictions = classifier.predict(data)
     for (x, d, y) in zip(predictions, ex, actual):
@@ -189,6 +191,14 @@ def rms(classifier, data, ex, actual):
         z, y = catpos[x][c], float(y)
         squareSum += (z-y)*(z-y)
         n += 1.0
+        
+        pp = z - y
+        d = {'expected sign': sign(z), 'actual sign': sign(y)}
+        if sign(z) == sign(y):
+            m += 1.0
+        o.writerow(d)
+    
+    print "Correctness accuracy is ", m/n
     
     return math.sqrt(squareSum/n)
 
