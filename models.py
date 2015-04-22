@@ -16,7 +16,7 @@ class User:
         
         self.rating = None
         
-    def getRating(self):
+    def getRating(self, granularity = 10):
         # Gets the user's rating on a [-5, -4, ... 0 ... 4, 5] scale based on 
         # how often they answer correctly.
         if(self.rating == None):
@@ -24,7 +24,7 @@ class User:
             answered = counter[False] + counter[True]
             if answered > 0:
                 correctness = counter[True] / float(answered)
-                self.rating = round((correctness - 0.5) * 10, 0)
+                self.rating = round((correctness - 0.5) * granularity, 0)
             else:
                 self.rating = "0"
                 

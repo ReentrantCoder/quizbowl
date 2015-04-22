@@ -128,33 +128,4 @@ class Dataset:
         return self.groupBy((train, test), lambda x: x.questionId)
 
     def groupByCategory(self,(train,test)):
-        C_train = {}
-        C_test = {}
-        U = self.groupByUser((train,test))
-        #for each user determine the category for which they answer most questions
-        #dictionary mapping category to users who answer most of the questions
-        #return two dictionaries one for train and one for test
-        for (id,user) in U.items():
-            category_train = Counter()
-            print user.train
-            for q in user.train:
-                category_train[q.questionCategory]+=1
-            print category_train.most_common(1)
-            if len(category_train)!=0:
-                bestC = category_train.most_common(1)[0][0]
-                try:
-                    C_train[bestC].append(user)
-                except KeyError:
-                    C_train[bestC] = [user]
-    
-                category_test = Counter()
-                for q in user.train:
-                        category_test[q.questionCategory]+=1
-                bestC = category_test.most_common(1)[0][0]
-                try:
-                    C_test[bestC].append(user)
-                except KeyError:
-                        C_test[bestC] = [user]
-    
-        return C_train,C_test
-
+        return self.groupBy((train, test), lambda x: x.questionCategory)
