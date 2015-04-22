@@ -25,7 +25,7 @@ class FileFormat:
 
     def serialize(self, entities, filePath):
         with open(filePath, 'wb') as csvFile:
-            writer = csv.DictWriter(csvFile, fieldnames=self.fieldnames)
+            writer = csv.DictWriter(csvFile, fieldnames=self.fieldnames, extrasaction='ignore')
             
             if not self.skipHeader:
                 writer.writeheader()

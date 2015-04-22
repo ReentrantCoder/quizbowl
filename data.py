@@ -4,6 +4,8 @@ from numpy.ma.core import mean
 import ast
 
 from collections import Counter, defaultdict
+from math import sqrt
+
 
 class TestData:
     def __init__(self):
@@ -55,7 +57,8 @@ class Dataset:
             #data.questionWords = ast.literal_eval(Q[data.questionId]["blob"])
             data.userId = t["user"]
             data.userAnswer = t["answer"]
-            data.position = t["position"]
+            data.position = int(float(t["position"]))
+            data.isCorrect = (data.position > 0)
             train.append(data)
             
         test = []
@@ -64,7 +67,7 @@ class Dataset:
             if questionId not in Q:
                 continue
 
-            data = TestData()
+            data = TrainingData()
             data.id = t["id"]
             data.questionId = t["question"]
             data.questionCategory = Q[data.questionId]["category"]
@@ -78,37 +81,51 @@ class Dataset:
             return (train, test)
         
         return (train[:limit], test[:limit])
+
+    def splitTrainTest(self, train, bucket):
+        shuffle(train)
+        asTest = train[:bucket]
+        asTrain = train[bucket:]
+        return asTrain, asTest
     
     def crossValidate(self, train, K, f):
         bucket = len(train)/K
 
         values = []
         for k in xrange(0, K):
-            shuffle(train)
-    
-            asTest = train[:bucket]
-            asTrain = train[bucket:]
-            
+            asTrain, asTest = self.splitTrainTest(train, bucket)
             values.append( f(asTrain, asTest) )
-        
-        return mean(values)
+
+        mu = mean(values)
+        sigma = sqrt(mean(mean([ pow(x - mu, 2) for x in values])))
+                
+        return (mu, sigma)
     
-    def groupByUser(self, (train, test)):
+    def groupBy(self, (train, test), f):
         U = {}
 
         for x in train:
-            if not x.userId in U:
-                U[x.userId] = User(x.userId);
+            _key = f(x)
+            if not _key in U:
+                U[_key] = User(_key);
             
-            U[x.userId].train.append(x)
+            U[_key].train.append(x)
         
-        for x in test:
-            if not x.userId in U:
-                U[x.userId] = User(x.userId);
-            
-            U[x.userId].test.append(x)
+        if test != None:
+            for x in test:
+                _key = f(x)
+                if not _key in U:
+                    U[_key] = User(_key);
+                
+                U[_key].test.append(x)
 
         return U
+
+    def groupByUser(self, (train, test)):
+        return self.groupBy((train, test), lambda x: x.userId)
+
+    def groupByQuestion(self, (train, test)):
+        return self.groupBy((train, test), lambda x: x.questionId)
 
     def groupByCategory(self,(train,test)):
         C_train = {}

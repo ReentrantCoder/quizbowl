@@ -6,19 +6,29 @@ from numpy.core.fromnumeric import reshape
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.neighbors.kde import KernelDensity
+from collections import Counter
 
 class User:
     def __init__(self, userId):
         self.userId = userId
         self.test = []
         self.train = []
-'''
-class Category:
-    def __init__(self,category):
-        self.category = category
-        self.test = []
-        self.train = []
-'''
+        
+        self.rating = None
+        
+    def getRating(self):
+        # Gets the user's rating on a [-5, -4, ... 0 ... 4, 5] scale based on 
+        # how often they answer correctly.
+        if(self.rating == None):
+            counter = Counter([x.isCorrect for x in self.train])
+            answered = counter[False] + counter[True]
+            if answered > 0:
+                correctness = counter[True] / float(answered)
+                self.rating = round((correctness - 0.5) * 10, 0)
+            else:
+                self.rating = "0"
+                
+        return self.rating
 
 class OriginalModel:
     def __init__(self, user, featurizer):
