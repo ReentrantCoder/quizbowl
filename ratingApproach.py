@@ -6,6 +6,9 @@ from numpy.lib.function_base import average
 from random import random
 from numpy.core.umath import sign
 from copy import deepcopy
+from numpy.core.multiarray import correlate
+from scipy.stats.stats import pearsonr
+from itertools import groupby
 
 class RatingModel:
     def __init__(self, userGranularity, questionGranularity):
@@ -256,6 +259,8 @@ def getRefinedModel(dataset, train, userGran, quesGran):
                 if after >= adjustStandard: raise ValueError
                 if validateAfter >= validateStandard: raise ValueError
                 
+                print("%f %f" % (after, validateAfter))
+                
                 model = offshot
                 adjustStandard = after
                 validateStandard = validateAfter
@@ -273,20 +278,47 @@ def meanSquareError(predictions, test):
 def accuracy(predictions, test):
     return (len(predictions) + sum(map(lambda (a, b): sign(a["position"])*sign(b.position), zip(predictions, test)))) / float(2.0 * len(predictions))
 
-class SentenceFacts: 
-    def properRating(self, words):
-        return self.__percent(words, lambda w: len(w) > 0 and w[0].isupper())
+class WordFacts:
+    def isPronoun(self, w):
+        return w.lower() in [
+            # personal pronouns
+            "I", "me", "we", "us", "you", "she", "her", "he", "him", "it", "they", "them", 
+            # relative pronouns
+            "that", "which", "who", "whom", "whose", "whichever", "whoever", "whomever",
+            # Demonstrative pronouns
+            "this", "these", "that", "those",
+            # Indefinite pronouns
+            "anybody", "anyone", "anything", "each", "either", "everybody", "everyone", "everything", "neither", "nobody", "nothing", "one", "somebody", "someone", "something", "both", "few", "many", "several", "all", "any", "most", "none", "some",
+            # reflexive pronouns
+            "myself", "ourselves", "yourself", "yourselves", "himself", "herself", "itself", "themselves",
+            # Interrogative pronouns
+            "what", "who", "which", "whom", "whose",
+            # Possessive pronouns
+            "my", "your", "his", "her", "its", "our", "your", "their", "mine", "yours", "hers", "ours", "ours", "yours", "theirs",
+            # Subject and object pronouns
+            "I", "you", "she", "he", "it", "we", "you", "they", "me", "you", "her", "him", "it", "us", "you", "them"
+            ]
 
-    def numberRating(self, words):
-        return self.__percent(words, lambda w: self.__isNumber(w))
-
-    def __isNumber(self, w):
+    def isNumber(self, w):
         try:
             float(w)
             return True
         except ValueError:
             return False
+
+class SentenceFacts: 
+    def __init__(self):
+        self.wf = WordFacts()
     
+    def properRating(self, words):
+        return self.__percent(words, lambda w: len(w) > 0 and w[0].isupper())
+
+    def numberRating(self, words):
+        return self.__percent(words, lambda w: self.wf.isNumber(w))
+
+    def pronounRating(self, words):
+        return self.__percent(words, lambda w: self.wf.isPronoun(w))
+
     def __percent(self, words, f):
         testPositive = 0.0
         outOf = 0.0
@@ -294,8 +326,61 @@ class SentenceFacts:
             if f(w):
                 testPositive += 1
             outOf += 1
+
+        if outOf == 0.0:
+            return float("NaN")
             
         return round((0.5 - (testPositive / outOf)) * 10.0, 0)
+
+def getLengthGranularity(train):
+    positions = [abs(t.position) for t in train]
+    lengths = [len(t.questionText) for t in train]
+
+    corrOpt = float("-inf")
+    jOpt = None
+
+    for j in xrange(1, 50):
+        D = {}
+        for (p, l) in zip(positions, lengths):
+            key = round(l/j, 0) * j
+            if not key in D:
+                D[key] = []
+
+            D[key].append(p)
+
+        pivot = { k : average(v) - j for (k,v) in D.items() }
+
+        corr = pearsonr(pivot.keys(), pivot.values())
+        if corr > corrOpt:
+            corrOpt = corr 
+            jOpt = j
+    
+    return jOpt
+
+def useQuestionLengthToPredictPosition(fTrain, fTest):
+    lengthGran = getLengthGranularity(fTrain)
+
+    predictions = []
+    results = []
+    for t in fTest:
+        x = round(len(t.questionText) / lengthGran, 0) * lengthGran
+        predictedPos = 0.1311 * x + 1.7077
+ 
+        ratingPredict = model.predict([t])[0]
+        predictions.append(ratingPredict)
+         
+        correctness = 1
+        if ratingPredict["position"] < 0:
+            correctness = -1
+ 
+        results.append({"id": t.id, "position": predictedPos * correctness })
+
+    print meanSquareError(predictions, fTest)
+    print accuracy(predictions, fTest)
+
+    print meanSquareError(results, fTest)
+    print accuracy(results, fTest)
+
 
 if __name__ == '__main__':
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
@@ -308,27 +393,28 @@ if __name__ == '__main__':
 #             print("%f, %f" % dataset.crossValidate(train, 5, lambda trainFold, testFold: 
 #                   meanSquareError(getSimplePredictions(dataset, trainFold, testFold, i, j), testFold) ))
 
-    print("%f, %f" % dataset.crossValidate(train, 10, lambda trainFold, testFold: 
-          accuracy(RatingModel(7, 2).fit(dataset, trainFold).predict(testFold), testFold) ))
+#     print("%f, %f" % dataset.crossValidate(train, 10, lambda trainFold, testFold: 
+#           accuracy(RatingModel(7, 2).fit(dataset, trainFold).predict(testFold), testFold) ))
 
-    fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
-    model = RatingModel(7, 2)
-    model.fit(dataset, fTrain)
- 
-    sf = SentenceFacts()
- 
-    for (p,t) in zip( model.predict(fTest), fTest):
-        qRating = "NA" if not t.questionId in model.questionRatings else model.questionRatings[t.questionId]
-        uRating = "NA" if not t.userId in model.userRatings else model.userRatings[t.userId]
-        predicted = round(p["position"]/5.0,0)*5.0
-        actual = round(t.position/5.0,0)*5.0
-        category = t.questionCategory
-        isCorrect = sign(predicted) == sign(actual)
-        words = t.questionText.split()
+#     fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
+#     model = RatingModel(7, 2)
+#     model.fit(dataset, fTrain)
 
-        print (qRating, uRating, category, predicted, actual, actual - predicted, isCorrect, sf.properRating(words), sf.numberRating(words) )
+#     for (p,t) in zip( model.predict(fTest), fTest):
+#         qRating = "NA" if not t.questionId in model.questionRatings else model.questionRatings[t.questionId]
+#         uRating = "NA" if not t.userId in model.userRatings else model.userRatings[t.userId]
+#         predicted = round(p["position"]/5.0,0)*5.0
+#         actual = round(t.position/5.0,0)*5.0
+#         category = t.questionCategory
+#         isCorrect = sign(predicted) == sign(actual)
+#         words = t.questionText[:int(abs(actual))].split()[-6:-1]
+#         for i in xrange(0, len(words)):
+#             words[i] = words[i].strip(',')
+# 
+#         print str((qRating, uRating, category, predicted, actual, actual - predicted, isCorrect, len(t.questionText))).strip("(").strip(")")
 
-#     model = getModel(dataset, train, 7, 2)
-#     predictions = model.predict(test)
-#     fileFormat = GuessFormat()
-#     fileFormat.serialize(predictions, "data/guess.csv") 
+    model = getRefinedModel(dataset, train, 7, 2)
+    predictions = model.predict(test)
+     
+    fileFormat = GuessFormat()
+    fileFormat.serialize(predictions, "data/guess.csv") 
