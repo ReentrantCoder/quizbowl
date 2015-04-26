@@ -9,6 +9,9 @@ from copy import deepcopy
 from numpy.core.multiarray import correlate
 from scipy.stats.stats import pearsonr
 from itertools import groupby
+from sklearn.linear_model.logistic import LogisticRegression
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model.coordinate_descent import Lasso
 
 class RatingModel:
     def __init__(self, userGranularity, questionGranularity):
@@ -245,7 +248,7 @@ def getRefinedModel(dataset, train, userGran, quesGran):
 
         # Create a copy of the model, and try nudging a parameter by some amount
         offshot = deepcopy(model)
-        offshot.adjust([x], 0.05)
+        offshot.adjust([x], 0.1)
         
         # Measure the MSE after for the adjust and validation sets
         after = meanSquareError(offshot.predict(adjustTest), adjustTest)
@@ -266,6 +269,41 @@ def getRefinedModel(dataset, train, userGran, quesGran):
                 validateStandard = validateAfter
 
     return model
+
+def applyPredictedCorrections(fTrain, fTest, pTrain, pTest):
+    # Idea here is attempt to correct predictions based on the words leading up to the predicted position
+    wordsTrain = []
+    Y = []
+ 
+    for (f, p) in zip(fTrain, pTrain):
+        actual = round(f.position/5.0,0)*5.0
+        predicted = round(p["position"]/5.0, 0)*5.0
+        
+        leadingWords = f.questionText[0:int(abs(actual))].split()[-5:]
+        wordsTrain.append(" ".join(leadingWords))
+        Y.append( round((actual - predicted)/25.0, 0)*25 )
+
+    cv = CountVectorizer()
+    X = cv.fit_transform(wordsTrain)
+
+    lr = LogisticRegression()
+    lr.fit(X, Y)
+
+    wordsTest = []
+
+    for (f, p) in zip(fTest, pTest):
+        predicted = p["position"]
+        leadingWords = f.questionText[0:int(abs(predicted)) + 50].split()[-6:]
+        wordsTest.append(" ".join(leadingWords))
+
+    corrections = lr.predict(cv.transform(wordsTest))
+
+    for (c, p) in zip(corrections, pTest):
+        if abs(c) >= 150:
+            p["position"] += c
+
+    return pTest
+
 
 def getPredictActual(dataset, train, test, userGran, quesGran):
     model = RatingModel(userGran, quesGran)
@@ -357,64 +395,61 @@ def getLengthGranularity(train):
     
     return jOpt
 
-def useQuestionLengthToPredictPosition(fTrain, fTest):
-    lengthGran = getLengthGranularity(fTrain)
-
-    predictions = []
-    results = []
-    for t in fTest:
-        x = round(len(t.questionText) / lengthGran, 0) * lengthGran
-        predictedPos = 0.1311 * x + 1.7077
- 
-        ratingPredict = model.predict([t])[0]
-        predictions.append(ratingPredict)
-         
-        correctness = 1
-        if ratingPredict["position"] < 0:
-            correctness = -1
- 
-        results.append({"id": t.id, "position": predictedPos * correctness })
-
-    print meanSquareError(predictions, fTest)
-    print accuracy(predictions, fTest)
-
-    print meanSquareError(results, fTest)
-    print accuracy(results, fTest)
-
+# def useQuestionLengthToPredictPosition(fTrain, fTest):
+#     lengthGran = getLengthGranularity(fTrain)
+# 
+#     predictions = []
+#     results = []
+#     for t in fTest:
+#         x = round(len(t.questionText) / lengthGran, 0) * lengthGran
+#         predictedPos = 0.1311 * x + 1.7077
+#  
+#         ratingPredict = model.predict([t])[0]
+#         predictions.append(ratingPredict)
+#          
+#         correctness = 1
+#         if ratingPredict["position"] < 0:
+#             correctness = -1
+#  
+#         results.append({"id": t.id, "position": predictedPos * correctness })
+# 
+#     print meanSquareError(predictions, fTest)
+#     print accuracy(predictions, fTest)
+# 
+#     print meanSquareError(results, fTest)
+#     print accuracy(results, fTest)
 
 if __name__ == '__main__':
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
 
-# #    Explore parameter space
-#     for i in xrange(1, 12):
-#         for j in xrange(1, 12):
-#             print("%f, %f, " % (i,j)),
-#             print("%f, %f" % dataset.crossValidate(train, 5, lambda trainFold, testFold: 
-#                   meanSquareError(getSimplePredictions(dataset, trainFold, testFold, i, j), testFold) ))
-
-#     print("%f, %f" % dataset.crossValidate(train, 10, lambda trainFold, testFold: 
-#           accuracy(RatingModel(7, 2).fit(dataset, trainFold).predict(testFold), testFold) ))
+    print("%f, %f" % dataset.crossValidate(train, 5, lambda trainFold, testFold: meanSquareError(RatingModel(7,2).fit(dataset, trainFold).predict(testFold), testFold) ))
 
 #     fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
 #     model = RatingModel(7, 2)
-#     model.fit(dataset, fTrain)
+# #     model = getRefinedModel(dataset, train, 7, 2)
+#     model.fit(dataset, fTrain) 
+# 
+#     pTrain = model.predict(fTrain)
+#     pTest = model.predict(fTest)
+#     pTest = applyPredictedCorrections(fTrain, fTest, pTrain, pTest)
 
-#     for (p,t) in zip( model.predict(fTest), fTest):
+#     for (p,t) in zip( pTest, fTest):
 #         qRating = "NA" if not t.questionId in model.questionRatings else model.questionRatings[t.questionId]
 #         uRating = "NA" if not t.userId in model.userRatings else model.userRatings[t.userId]
 #         predicted = round(p["position"]/5.0,0)*5.0
 #         actual = round(t.position/5.0,0)*5.0
 #         category = t.questionCategory
-#         isCorrect = sign(predicted) == sign(actual)
-#         words = t.questionText[:int(abs(actual))].split()[-6:-1]
-#         for i in xrange(0, len(words)):
-#             words[i] = words[i].strip(',')
+#         predictCorrect = sign(predicted)
+#         actCorrect = sign(actual)
+#         lRating = round(len(t.questionText)/40.0, 0) * 40
+#         error = actual - predicted
 # 
-#         print str((qRating, uRating, category, predicted, actual, actual - predicted, isCorrect, len(t.questionText))).strip("(").strip(")")
+#         print str((qRating, uRating, predicted, actual, category, actCorrect, predictCorrect, lRating, error)).strip("(").strip(")")
 
-    model = getRefinedModel(dataset, train, 7, 2)
-    predictions = model.predict(test)
-     
-    fileFormat = GuessFormat()
-    fileFormat.serialize(predictions, "data/guess.csv") 
+
+#     model = getRefinedModel(dataset, train, 7, 2)
+#     predictions = model.predict(test)
+#      
+#     fileFormat = GuessFormat()
+#     fileFormat.serialize(predictions, "data/guess.csv") 

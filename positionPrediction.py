@@ -1,6 +1,6 @@
 from sklearn.linear_model import Lasso
 from sklearn.feature_extraction.text import CountVectorizer
-from fileFormats import TrainFormat, TestFormat, QuestionFormat
+from fileFormats import TrainFormat, TestFormat, QuestionFormat, GuessFormat
 from data import Dataset
 from numpy.lib.function_base import average
 from math import sqrt
@@ -9,16 +9,19 @@ from sklearn.neighbors.classification import KNeighborsClassifier # not very acc
 from sklearn.neighbors.regression import KNeighborsRegressor # not very accurate
 from sklearn.svm.classes import SVR # Support vec machine was slow
 from sklearn.feature_extraction.dict_vectorizer import DictVectorizer
+from numpy.core.umath import sign
 
 class PositionPredictor:
-    def __init__(self, trainingSet, alpha, userRatings, questionRatings):
+    def __init__(self, dataset, trainingSet, alpha):
+        byUser = dataset.groupByUser((trainingSet, None))
+        byQuestion = dataset.groupByQuestion((trainingSet, None))
+
+        self.userRatings = { userId : user.getRating()  for (userId, user) in byUser.items()  } 
+        self.questionRatings = { questionId : question.getRating()  for (questionId, question) in byQuestion.items()  } 
+
         self.vectorizer = DictVectorizer()
-#         self.vectorizer = CountVectorizer(analyzer=self, binary=True)
         self.model = Lasso(alpha)
         
-        self.userRatings = userRatings
-        self.questionRatings = questionRatings
-
         self.model.fit(
             self.__trainX(trainingSet), 
             self.__trainY(trainingSet)
@@ -26,71 +29,62 @@ class PositionPredictor:
 
     def __call__(self, value):
         return {
-#             "Category": value.questionCategory,
-            "UserRating": self.userRatings[value.userId],
-            "QuestionRating": self.questionRatings[value.questionId]
+            # Category does not contribute positively
+            "Category": value.questionCategory
+            ,
+            "UserRating":  "NA" if not value.userId in self.userRatings else self.userRatings[value.userId]
+#             ,
+#             "QuestionRating": "NA" if not value.questionId in self.questionRatings else self.questionRatings[value.questionId]
+            ,
+            'LengthRating': round(len(value.questionText) / 38.0, 0) * 38
         }
- 
-#        yield "Category:" + value.questionCategory 
-#         yield "UserRating:" + str(self.userRatings[value.userId])
-#         yield "QuestionRating:" + str(self.questionRatings[value.questionId])
 
-
-
-            
     def getPosition(self, testExample):
         return self.model.predict( self.__testX( testExample ) )
 
     def __testX(self, testExample):
         return self.vectorizer.transform( [self(x) for x in testExample] )
-#         return self.vectorizer.transform( testExample )
 
     def __trainX(self, trainingSet):
         return self.vectorizer.fit_transform( [self(x) for x in trainingSet] )
-#         return self.vectorizer.fit_transform( trainingSet )
     
     def __trainY(self, trainingSet):
-        return [abs(x.position) for x in trainingSet]
+        return [(x.position) for x in trainingSet]
+
+def accuracy(predictions, test):
+    return (sum( [ sign(p) * sign(t.position) for (p,t) in zip(predictions, test)  ] ) + len(test)) / (2.0 * len(test))
 
 def meanSquareError(predictions, test):
-    return sqrt(average(map(lambda (a, b): (a - b)*(a - b), zip(predictions, [abs(x.position) for x in test]))))
+    return sqrt(average(map(lambda (a, b): (a - b)*(a - b), zip(predictions, [ (x.position) for x in test]))))
 
-def getPositionPredictions(dataset, train, test, alpha):
-    byUser = dataset.groupByUser((train, test))
-    userRatings = { userId : user.getRating()  for (userId, user) in byUser.items()  } 
-
-    byQuestion = dataset.groupByQuestion((train, test))
-    questionRatings = { questionId : question.getRating()  for (questionId, question) in byQuestion.items()  } 
-
-    predictor = PositionPredictor(train, alpha, userRatings, questionRatings)
-
-    predictions = predictor.getPosition(test)
-#     for i in xrange(0, len(predictions)):
-#         predictions[i] -= 10
-    
-    return predictions
 
 def reportPositionPrediction(dataset, training, alpha):
     print("Prediction MSE: %f +- %f" % 
           dataset.crossValidate(training, 10, lambda trainingFold, testFold: 
-            meanSquareError(getPositionPredictions(dataset, trainingFold, testFold, alpha), testFold)))
+            meanSquareError(PositionPredictor(dataset, trainingFold, alpha).getPosition(testFold), testFold)))
 
 if __name__ == "__main__":
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     training, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
-    reportPositionPrediction(dataset, training, .1)
+    fTraining, fTest = dataset.splitTrainTest(training, len(training)/5)
+    fTraining, holdout = dataset.splitTrainTest(fTraining, len(fTraining) / 5)
+    
+    reportPositionPrediction(dataset, fTraining, .1)
+
+    model = PositionPredictor(dataset, fTraining, .1)
+    pTest = model.getPosition(fTest)
+    pHoldout = model.getPosition(holdout)
+
+    print meanSquareError(pTest, fTest)
+    print accuracy(pTest, fTest)
+
+    print meanSquareError(pHoldout, holdout)
+    print accuracy(pHoldout, holdout)
+
+#     for (p,f) in zip(pTest, fTest):
+#         print str((f.position, p)).strip("(").strip(")")
 
 
- 
-    byUser = dataset.groupByUser((training, test))
-    userRatings = { userId : user.getRating()  for (userId, user) in byUser.items()  } 
- 
-    byQuestion = dataset.groupByQuestion((training, test))
-    questionRatings = { questionId : question.getRating()  for (questionId, question) in byQuestion.items()  } 
- 
- 
-#     fTrain, fTest = dataset.splitTrainTest(training, len(training) / 5)
-#     predictions = getPositionPredictions(dataset, fTrain, fTest, .1)
-#     differences = map(lambda (x,y): x.position - y, zip(fTest, predictions))
-#     for (x,y) in zip(fTest, differences):
-#         print("%s, %s, %s, %f" % ( questionRatings[x.questionId] , x.questionCategory, userRatings[x.userId], x.position))
+#     guesses = [ {"id": t.id, "position": p} for (t, p) in zip(test, predictions)]
+#     fileFormat = GuessFormat()
+#     fileFormat.serialize(guesses , "data/guess.csv")

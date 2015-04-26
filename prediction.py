@@ -1,20 +1,21 @@
 from data import Dataset
 from fileFormats import TrainFormat, TestFormat, QuestionFormat, GuessFormat
-from positionPrediction import getPositionPredictions, reportPositionPrediction
+from positionPrediction import reportPositionPrediction, PositionPredictor
 from correctnessPrediction import getCorrectnessPredictions, reportCorrectness
 from numpy.lib.function_base import average
 from math import sqrt
+from numpy.core.umath import sign
 
 def meanSquareError(entities):
     return sqrt(average(map(lambda x : ( x["position"] - x["actual"] )*( x["position"] - x["actual"] ), entities)))
 
 def getPredictions(dataset, training, test, alpha):
-    positions = getPositionPredictions(dataset, training, test, alpha)
+    positions = PositionPredictor(dataset, training, alpha).getPosition(test)
     correctness = getCorrectnessPredictions(dataset, training, test)
 
     return map(lambda (test, position, isCorrect): { 
         "id": test.id, 
-        "position": position if isCorrect else -position, 
+        "position": position if isCorrect and sign(position) > 0 else -0.5*position, 
         "actual": test.position }, 
         zip(test, positions, correctness))
     
