@@ -59,25 +59,28 @@ class WordYesNoModel:
             yield "<U:NA>"
 
         # Question rating
-        if question.id in self.questionRatings:
-            yield "<Q:" + str(self.questionRatings[question.id]) + ">"
+        if question.questionId in self.questionRatings:
+            yield "<Q:" + str(self.questionRatings[question.questionId]) + ">"
         else:
             yield "<Q:NA>"
 
         # Length rating
         yield "<L:" + str( round(len(question.questionText)/40, 0)*40 ) + ">"
 
-        # Leading words
-        x = 200
         if question.position:
             x = question.position
+            # Leading words
+            for word in question.questionText[:x].split()[-5:]:
+                yield word
+     
+            # Trailing words
+            for word in question.questionText[x:].split()[:5]:
+                yield word
+        else:
+            for word in question.questionText[0:200].split():
+                yield word
 
-        for word in question.questionText[:x].split()[-5:]:
-            yield word
 
-        # Trailing words
-        for word in question.questionText[x:].split()[:5]:
-            yield word
 
     def fit(self, train):
         wordsTrain = []
@@ -181,17 +184,35 @@ if __name__ == '__main__':
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
 
 #     print("%f %f" % dataset.crossValidate(train, 5, lambda trainFold, testFold: 
-#                                           meanSquareError(getSplitPredictions(trainFold, testFold), testFold)))
-  
+#                                           meanSquareError(getSplirtPredictions(trainFold, testFold), testFold)))
+
     fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
     fPredictions = getPredictions(fTrain, fTest)
     print("combined MSE: %f" % meanSquareError(fPredictions, fTest) )
     print("combined ACC: %f" % accuracy(fPredictions, fTest))
 
-    for (p, t) in zip(fPredictions, fTest):
-        print str((t.questionCategory, len(t.questionText), t.position, p["position"])).strip("(").strip(")")
+#     for (p, t) in zip(fPredictions, fTest):
+#         print str((t.questionCategory, len(t.questionText), t.position, p["position"])).strip("(").strip(")")
         
-
 #     predictions = getPredictions(train, test)
 #     guessFormat = GuessFormat()
 #     guessFormat.serialize(predictions, "data/guess.csv")
+
+    # Estimate Kaggle score based on intersection of test and train
+    predictions = getPredictions(train, test)
+
+    A = set([t.questionId for t in train])
+    B = set([t.questionId for t in test])
+    cap = A.intersection(B)
+    
+    trainLookup = {t.questionId : t for t in train}
+    predictionLookup = { t.questionId : p for (t, p) in zip(test, predictions) }
+
+    T = []
+    P = []
+    for questionId in cap:
+        T.append(trainLookup[questionId]) 
+        P.append(predictionLookup[questionId])
+    
+    print("overlap MSE: %f" % meanSquareError(P, T) )
+    print("overlap ACC: %f" % accuracy(P, T))

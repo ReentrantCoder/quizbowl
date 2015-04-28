@@ -7,6 +7,11 @@ from copy import deepcopy
 from scipy.stats.stats import pearsonr
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.feature_extraction.text import CountVectorizer
+from combinedApproach import PositionPredictor
+from sklearn.linear_model.coordinate_descent import Lasso
+from sklearn.linear_model.ridge import Ridge
+from sklearn.feature_extraction.dict_vectorizer import DictVectorizer
+from ctypes.test.test_prototypes import positive_address
 
 class RatingModel:
     def __init__(self, userGranularity, questionGranularity):
@@ -264,37 +269,43 @@ def getRefinedModel(dataset, train, userGran, quesGran):
 
     return model
 
-def applyPredictedCorrections(fTrain, fTest, pTrain, pTest):
-    # Idea here is attempt to correct predictions based on the words leading up to the predicted position
-    wordsTrain = []
-    Y = []
- 
+def applyPredictedCorrections(model, fTrain, fTest, pTrain, pTest):
+    errorX = []
+    errorY = []
     for (f, p) in zip(fTrain, pTrain):
-        actual = round(f.position/5.0,0)*5.0
-        predicted = round(p["position"]/5.0, 0)*5.0
-        
-        leadingWords = f.questionText[0:int(abs(actual))].split()[-5:]
-        wordsTrain.append(" ".join(leadingWords))
-        Y.append( round((actual - predicted)/25.0, 0)*25 )
+        actual = f.position
+        predicted = p["position"]
+        error = actual - predicted
 
-    cv = CountVectorizer()
-    X = cv.fit_transform(wordsTrain)
+        sample = {
+                  "uRating": "NA" if f.userId not in model.userRatings else model.userRatings[f.userId],
+                  "qRating": "NA" if f.questionId not in model.questionRatings else model.questionRatings[f.questionId],
+                }
 
-    lr = LogisticRegression()
-    lr.fit(X, Y)
+        errorX.append(sample)
+        errorY.append(error)
 
-    wordsTest = []
+    vectorizer = DictVectorizer()
+    X = vectorizer.fit_transform(errorX)
 
+    errorModel = Lasso(alpha=.1, normalize=True)
+    errorModel.fit(X, errorY)
+
+    testX = []
     for (f, p) in zip(fTest, pTest):
         predicted = p["position"]
-        leadingWords = f.questionText[0:int(abs(predicted)) + 50].split()[-6:]
-        wordsTest.append(" ".join(leadingWords))
 
-    corrections = lr.predict(cv.transform(wordsTest))
+        sample = {
+                  "uRating": "NA" if f.userId not in model.userRatings else model.userRatings[f.userId],
+                  "qRating": "NA" if f.questionId not in model.questionRatings else model.questionRatings[f.questionId],
+                }
+
+        testX.append( sample )
+
+    corrections = errorModel.predict(vectorizer.transform(testX))
 
     for (c, p) in zip(corrections, pTest):
-        if abs(c) >= 150:
-            p["position"] += c
+        p["position"] += 0.0008 * c
 
     return pTest
 
@@ -355,12 +366,35 @@ def getLengthGranularity(train):
 
 if __name__ == '__main__':
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
-    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
-
+    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)    
     fTrain, fTest = dataset.splitTrainTest(train, len(train) / 5)
-    fPredictions = RatingModel(7,2).fit(dataset, fTrain).predict(fTest)
-    print("combined MSE: %f" % meanSquareError(fPredictions, fTest) )
-    print("combined ACC: %f" % accuracy(fPredictions, fTest))
+
+    model = RatingModel(7, 2)
+    model.fit(dataset, fTrain)
+    pTrain = model.predict(fTrain)
+    pTest = model.predict(fTest)
+
+    for i in xrange(0, 100):
+        pTest = applyPredictedCorrections(model, fTrain, fTest, pTrain, pTest)
+        
+        print("%f %f" % (meanSquareError(pTest, fTest), accuracy(pTest, fTest)) )
+
+#     A = set([t.questionId for t in fTrain])
+#     B = set([t.questionId for t in fTest])
+#     cap = A.intersection(B)
+# 
+#     trainLookup = {t.questionId : t for t in fTrain}
+#     predictionLookup = { t.questionId : p for (t, p) in zip(fTest, predictions) }
+# 
+#     T = []
+#     P = []
+#     for questionId in cap:
+#         T.append(trainLookup[questionId]) 
+#         P.append(predictionLookup[questionId])
+#     
+#     print("overlap MSE: %f" % meanSquareError(P, T) )
+#     print("overlap ACC: %f" % accuracy(P, T))
+    
 
 #     model = getRefinedModel(dataset, train, 7, 2)
 #     predictions = model.predict(test)
