@@ -7,9 +7,13 @@ from data import Dataset
 from fileFormats import TrainFormat, TestFormat, QuestionFormat, GuessFormat
 from numpy.lib.function_base import average
 from math import sqrt
+from random import random
 
 class PositionPredictor:
-    def __init__(self, alpha):
+    def __init__(self, alpha, userGranularity, questionGranularity):
+        self.userGranularity = userGranularity
+        self.questionRatings = questionGranularity
+        
         self.vectorizer = DictVectorizer()
         self.model = Lasso(alpha)
 
@@ -28,8 +32,8 @@ class PositionPredictor:
         byUser = dataset.groupByUser((trainingSet, None))
         byQuestion = dataset.groupByQuestion((trainingSet, None))
 
-        self.userRatings = { userId : user.getRating()  for (userId, user) in byUser.items()  } 
-        self.questionRatings = { questionId : question.getRating()  for (questionId, question) in byQuestion.items()  } 
+        self.userRatings = { userId : user.getRating(self.userGranularity)  for (userId, user) in byUser.items()  } 
+        self.questionRatings = { questionId : question.getRating(self.questionRatings)  for (questionId, question) in byQuestion.items()  } 
 
         self.model.fit(
             self.__trainX(trainingSet), 
@@ -51,6 +55,10 @@ class PositionPredictor:
         return [abs(x.position) for x in trainingSet]
 
 class WordYesNoModel:
+    def __init__(self, userGranularity, questionGranularity):
+        self.userGranularity = userGranularity
+        self.questionRatings = questionGranularity
+    
     def __call__(self, question):
         # User rating
         if question.userId in self.userRatings:
@@ -67,20 +75,21 @@ class WordYesNoModel:
         # Length rating
         yield "<L:" + str( round(len(question.questionText)/40, 0)*40 ) + ">"
 
-        if question.position:
-            x = question.position
-            # Leading words
-            for word in question.questionText[:x].split()[-5:]:
-                yield word
-     
-            # Trailing words
-            for word in question.questionText[x:].split()[:5]:
-                yield word
-        else:
-            for word in question.questionText[0:200].split():
-                yield word
-
-
+#         if question.position:
+#             x = question.position
+#             # Leading words
+#             for word in question.questionText[:x].split()[-5:]:
+#                 yield word
+#      
+#             # Trailing words
+#             for word in question.questionText[x:].split()[:5]:
+#                 yield word
+#         else:
+        x = int(0.12 * len(question.questionText))
+        words = question.questionText[0:x].split()
+        for (next, curr) in zip(words[1:], words):
+            if(curr.lower() in ["this", "these", "that", "those"]):
+                yield next
 
     def fit(self, train):
         wordsTrain = []
@@ -110,10 +119,14 @@ def meanSquareError(predictions, test):
     return sqrt(average(map(lambda (a,b): pow(a["position"] - (b.position), 2), zip(predictions, test))))
 
 def meanAbsSquareError(predictions, test):
-    return sqrt(average(map(lambda (a,b): pow(a["position"] - abs(b.position), 2), zip(predictions, test))))
+    return sqrt(average(map(lambda (a,b): pow(abs(a["position"]) - abs(b.position), 2), zip(predictions, test))))
 
 def accuracy(predictions, test):
     return (len(predictions) + sum(map(lambda (a, b): sign(a["position"])*sign(b.position), zip(predictions, test)))) / float(2.0 * len(predictions))
+
+def accuracySign(predictions, test):
+    return (len(predictions) + sum(map(lambda (a, b): a*sign(b.position), zip(predictions, test)))) / float(2.0 * len(predictions))
+
 
 def getSplitPredictions(fTrain, fTest):
     # Build a model based on all answers that will predict if the question will be answered right or wrong
@@ -151,7 +164,7 @@ def getSplitPredictions(fTrain, fTest):
 
 def getPredictions(train, test):
     # Build a model based on all answers that will predict if the question will be answered right or wrong
-    yesNoModel = WordYesNoModel()
+    yesNoModel = WordYesNoModel(10, 10)
     yesNoModel.fit(train)
     yesNoPredict = yesNoModel.predict(test)
 
@@ -179,40 +192,125 @@ def getPredictions(train, test):
 
     return predictions
 
+class PosCorrPredictor:
+    def __init__(self, userGranularity, questionGranularity):
+        self.userGranularity = userGranularity 
+        self.questionGranularity = questionGranularity 
+
+        self.vectorizer = DictVectorizer()
+        self.model = LogisticRegression()
+    
+    def fit(self, dataset, training):
+        byUser = dataset.groupByUser((train, None))
+        byQuestion = dataset.groupByQuestion((train, None))
+
+        self.userRatings = { userId : user.getRating(self.userGranularity)  for (userId, user) in byUser.items()  } 
+        self.questionRatings = { questionId : question.getRating(self.questionGranularity)  for (questionId, question) in byQuestion.items()  } 
+
+        X = self.trainX(training)
+        X = self.vectorizer.fit_transform(X)
+        Y = self.trainY(training)
+        
+        self.model.fit(X, Y)
+        
+        return self
+
+    def getFeature(self, text, x):
+        count = 0
+        x = int(round(x))+1
+        words = text[0:x].split()
+        for (prev, next) in zip(words, words[1:]):
+#             #Capture the number of instances where the subject is mentioned
+#             if prev.lower().strip() in ["this", "that", "these", "those"]:
+#                 count += 1
+
+            # Attempt to capture the number of hints which are assumed to be separated by ", . ; and or"
+            if prev.endswith(",") or prev.endswith(".") or prev.endswith(";") or prev.lower() in ["and", "or"]:
+                count += 1
+        
+        return count
+
+    def predict(self, test, predictedPositions):
+        return self.model.predict(self.vectorizer.transform(self.testX(test, predictedPositions)))
+
+    def testX(self, test, predictedPositions):
+        X = []
+        for (t,p) in zip(test, predictedPositions):
+            X.append({
+                "userRating": "NA" if not t.userId in self.userRatings else self.userRatings[t.userId],
+                "questionRating": "NA" if not t.questionId in self.questionRatings else self.questionRatings[t.questionId],
+#                 "lengthRating": str( round(len(t.questionText)/40, 0)*40 ),
+#                 "textHints": self.getFeature(t.questionText, p["position"])
+            })
+
+        return X
+
+    def trainX(self, training):
+        X = []
+        for t in training:
+            X.append({
+                "userRating": "NA" if not t.userId in self.userRatings else self.userRatings[t.userId],
+                "questionRating": "NA" if not t.questionId in self.questionRatings else self.questionRatings[t.questionId],
+#                 "lengthRating": str( round(len(t.questionText)/40, 0)*40 ),
+#                 "textHints": self.getFeature(t.questionText, t.position)
+            })
+
+        return X
+
+    def trainY(self, training):
+        Y = []
+        for t in training:
+            if t.position > 0:
+                Y.append(1)
+            else:
+                Y.append(-1)
+
+        return Y
+
+def getPosToCorrPredictions(dataset, trainFold, testFold):
+    posPredictor = PositionPredictor(1/20.0, 7, 10)
+    posPredictor.fit(dataset, trainFold)
+    positionPredictions = posPredictor.predict(testFold)
+
+    corPredictor = PosCorrPredictor(12, 9)
+    corPredictor.fit(dataset, trainFold)
+    yesNoPredictions = corPredictor.predict(testFold, positionPredictions)
+ 
+    return [ {"id": p["id"], "position": - 0.246850394 * p["position"] if c < 0 else 0.609901599 * p["position"] } for (p, c) in zip(positionPredictions, yesNoPredictions) ]
+
 if __name__ == '__main__':
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
 
-#     print("%f %f" % dataset.crossValidate(train, 5, lambda trainFold, testFold: 
-#                                           meanSquareError(getSplirtPredictions(trainFold, testFold), testFold)))
+    # Figure out what percent of users are in both train and test sets
+    A = set([ t.userId for t in train ])
+    B = set([ t.userId for t in test ])
+    cap = A.intersection(B)
+    cup = A.union(B)
+    knownUsers = len(cap) / float(len(cup))
 
-    fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
-    fPredictions = getPredictions(fTrain, fTest)
-    print("combined MSE: %f" % meanSquareError(fPredictions, fTest) )
-    print("combined ACC: %f" % accuracy(fPredictions, fTest))
+    # Figure out what percent of questions are in both train and test sets
+    A = set([ t.questionId for t in train ])
+    B = set([ t.questionId for t in test ])
+    cap = A.intersection(B)
+    cup = A.union(B)
+    knownQuestions = len(cap) / float(len(cup))
 
-#     for (p, t) in zip(fPredictions, fTest):
+    # Make the training set look like the test set by introducing uncertainty
+    for t in train:
+        if( random() > knownUsers ):
+            t.userId = "NA"
+        if( random() > knownQuestions ):
+            t.questionId = "NA"
+
+    print("%f %f" % dataset.crossValidate(train, 10, lambda trainFold, testFold: 
+        meanSquareError(getPosToCorrPredictions(dataset, trainFold, testFold), testFold)))
+# 
+#     fTrain, fTest = dataset.splitTrainTest(train, len(train)/5)
+#     predictions = getPosToCorrPredictions(dataset, fTrain, fTest)
+#     for (p, t) in zip(predictions, fTest):
 #         print str((t.questionCategory, len(t.questionText), t.position, p["position"])).strip("(").strip(")")
-        
-#     predictions = getPredictions(train, test)
+
+#     predictions = getPosToCorrPredictions(dataset, train, test)
 #     guessFormat = GuessFormat()
 #     guessFormat.serialize(predictions, "data/guess.csv")
-
-    # Estimate Kaggle score based on intersection of test and train
-    predictions = getPredictions(train, test)
-
-    A = set([t.questionId for t in train])
-    B = set([t.questionId for t in test])
-    cap = A.intersection(B)
-    
-    trainLookup = {t.questionId : t for t in train}
-    predictionLookup = { t.questionId : p for (t, p) in zip(test, predictions) }
-
-    T = []
-    P = []
-    for questionId in cap:
-        T.append(trainLookup[questionId]) 
-        P.append(predictionLookup[questionId])
-    
-    print("overlap MSE: %f" % meanSquareError(P, T) )
-    print("overlap ACC: %f" % accuracy(P, T))
