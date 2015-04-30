@@ -232,6 +232,9 @@ class PosCorrPredictor:
 
     def predict(self, test, predictedPositions):
         return self.model.predict(self.vectorizer.transform(self.testX(test, predictedPositions)))
+        
+    def predict_proba(self, test, predictedPositions):
+        return self.model.predict_proba(self.vectorizer.transform(self.testX(test, predictedPositions)))
 
     def testX(self, test, predictedPositions):
         X = []
@@ -275,8 +278,19 @@ def getPosToCorrPredictions(dataset, trainFold, testFold):
     corPredictor = PosCorrPredictor(12, 9)
     corPredictor.fit(dataset, trainFold)
     yesNoPredictions = corPredictor.predict(testFold, positionPredictions)
+    yesNoProbs = corPredictor.predict_proba(testFold, positionPredictions)
  
     return [ {"id": p["id"], "position": - 0.246850394 * p["position"] if c < 0 else 0.609901599 * p["position"] } for (p, c) in zip(positionPredictions, yesNoPredictions) ]
+    
+    #return [ {"id": p["id"], "position": - 0.246850394 * hedge_bets(p["position"], conf) if c < 0 else 0.609901599 * hedge_bets(p["position"], conf) } for (p, c, conf) in zip(positionPredictions, yesNoPredictions, yesNoProbs) ]
+
+def hedge_bets(guess, conf, mean = 39.298062750052644):
+    ## diff is between 0 (no confidence) and 1 (high confidence)
+    ## it is the difference in probabilities for predicting yes and no, respectively
+    ## output is confidence-weight position guess
+    ## the less confident the guess, the more it is dragged towards the mean
+    diff = abs(conf[0] - conf[1]) 
+    return guess*diff + mean*(1 - diff)
 
 if __name__ == '__main__':
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
