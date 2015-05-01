@@ -2,6 +2,8 @@
 #Take in questions
 #Take in difference we care about (how much is too much to be off by
 
+from __future__ import division
+
 from numpy import array
 from fileFormats import *
 
@@ -20,7 +22,7 @@ from sklearn.metrics import accuracy_score
 
 import math
 from numpy.ma.core import mean
-from numpy import sign
+from numpy import sign,sqrt,mean,power,average
 
 import fileFormats
 import data
@@ -46,6 +48,13 @@ def compute_error_analysis(predicted,actual,maxDiff):
     print cat_off
     print cat_answer
     print all_cat
+    print percent_category_missed(cat_off,all_cat,)
+    print percent_category_missed(cat_answer,all_cat,)
+    print mse(predicted,actual)
+
+def mse(predicted,actual):
+    
+    return sqrt(average(map(lambda (a,b): pow(a["position"] - (b.position), 2), zip(predicted, actual))))
 
 def position_off(predicted,actual,maxDiff):
     missedQuestions = []
@@ -95,6 +104,15 @@ def categories(wrong):
             cat[w[0]['category']]=1
 
     return cat
+
+def percent_category_missed(wrong,total):
+    percent_missed = {}
+    for key,value in total.iteritems():
+        if wrong.has_key(key):
+            percent_missed[key] = (wrong[key]/value)*100
+        else:
+            percent_missed[key] = 0
+    return percent_missed
 
 #def length(wrong):
 

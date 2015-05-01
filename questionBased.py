@@ -1,3 +1,5 @@
+
+
 from sklearn import cross_validation
 from sklearn import datasets
 
@@ -18,7 +20,7 @@ from sklearn.linear_model.ridge import Ridge
 from sklearn.feature_extraction.dict_vectorizer import DictVectorizer
 from sklearn.svm import SVR
 from errorAnalysis import *
-
+from sklearn import linear_model
 
 
 def load_data():
@@ -46,7 +48,7 @@ def total_hints(text):
 #Modified from features.py.  All the possible features of an question
 def example(question,train=True):
     
-    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'hints': total_hints(question.questionText)}
+    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'hints': total_hints(question.questionText),'answer':question.questionAnswer.lower(),'fragment':question.getQuestionFragment()}
     
     if train:
         target = question.position
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     positions = [q.position for q in train]
     print len(positions)
     print len(train)
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.4, random_state=0)
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.9, random_state=None)
 
     
     questions = QuestionFormat()
@@ -115,21 +117,46 @@ if __name__ == '__main__':
     t_test = feat.test_feature(f_test)
     #print features
     #print X_train
-    svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
-    svr_lin = SVR(kernel='linear', C=1e3)
-    svr_poly = SVR(kernel='poly', C=1e3, degree=2)
-    y_rbf = svr_rbf.fit(t, y_train).predict(t_test)
-    predictions = []
-    for index,value in enumerate(y_rbf):
-        predictions.append({'id':X_test[index].id,'position': value})
-    compute_error_analysis(predictions,X_test,25)
-    #y_lin = svr_lin.fit(features, positions).predict(X_test)
-    #y_poly = svr_poly.fit(features, positions).predict(X_test)
-
-
-
-
+    #svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
+    #svr_lin = SVR(kernel='linear', C=1e3)
+    #svr_poly = SVR(kernel='poly', C=1e3, degree=2)
+    #clf = linear_model.LinearRegression()
+    #clf = linear_model.Ridge (alpha = 0.05)
+    clf = linear_model.Lasso(alpha = 0.1)
     
+    '''
+    y_rbf = svr_rbf.fit(t, y_train).predict(t_test)
+    predictions_rbf = []
+    predictions_lin = []
+    predictions_poly = []
+    for index,value in enumerate(y_rbf):
+        predictions_rbf.append({'id':X_test[index].id,'position': value})
+    compute_error_analysis(predictions_rbf,X_test,25)
+    '''
+    classifier = clf.fit(t, y_train)
+    y_lin = classifier.predict(t_test)
+    predictions_lin = []
+    for index,value in enumerate(y_lin):
+        predictions_lin.append({'id':X_test[index].id,'position': value})
+    compute_error_analysis(predictions_lin,X_test,25)
+    #print predictions_lin
+
+    #Training Data
+    pred_train = classifier.predict(t)
+    predictions_lin = []
+    for index,value in enumerate(pred_train):
+        predictions_lin.append({'id':X_train[index].id,'position': value})
+    compute_error_analysis(predictions_lin,X_train,25)
+
+    '''
+    y_poly = svr_poly.fit(t, y_train).predict(X_test)
+    for index,value in enumerate(y_poly):
+        predictions_poly.append({'id':X_test[index].id,'position': value})
+    compute_error_analysis(predictions_poly,X_test,25)
+    '''
+
+
+
 
 
 
