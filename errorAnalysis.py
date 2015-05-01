@@ -32,8 +32,7 @@ question_info = questions.generatorToDict((questions.deserialize("data/questions
 
 #Assume actual in TrainingData Format
 #Assume predicted is a dictionary of the form {"id": id, "position": predicted position}
-#Returns Ordered List of question,error_posstion pairs
-#error_position: how far off we are in terms of absolute value of predicted position
+
 
 def compute_error_analysis(predicted,actual,maxDiff):
     missedQuestions = position_off(predicted,actual,maxDiff)
@@ -45,17 +44,23 @@ def compute_error_analysis(predicted,actual,maxDiff):
     print len(predicted)
     print len(missedQuestions)
     print len(wrong_answer)
+    print "accuracy"
+    print (1-(len(wrong_answer)/len(predicted)))*100
+    '''
     print cat_off
     print cat_answer
     print all_cat
     print percent_category_missed(cat_off,all_cat,)
     print percent_category_missed(cat_answer,all_cat,)
+    '''
     print mse(predicted,actual)
 
 def mse(predicted,actual):
     
     return sqrt(average(map(lambda (a,b): pow(a["position"] - (b.position), 2), zip(predicted, actual))))
 
+#Returns Ordered List of question,error_posstion pairs
+#error_position: how far off we are in terms of absolute value of predicted position
 def position_off(predicted,actual,maxDiff):
     missedQuestions = []
     for index,value in enumerate(predicted):
@@ -73,6 +78,7 @@ def position_off(predicted,actual,maxDiff):
     #print ordered[0]
     return ordered
 
+#Returns List of questions that whose prediction and answer do not match correctness
 def incorrect_predicted_answer(predicted,actual):
     wrong_answer = []
     for index,value in enumerate(predicted):
@@ -84,6 +90,7 @@ def incorrect_predicted_answer(predicted,actual):
             wrong_answer.append((question_info[actual[index].questionId],(value['position'],actual[index].position)))
     return wrong_answer
 
+#Returns dictionary of categories -> total occurances
 def all_categories(actual):
     cat = {}
     for a in actual:
@@ -95,6 +102,7 @@ def all_categories(actual):
             cat[key]=1
     return cat
 
+#Returns dictionary of categories -> sign of answers don't match
 def categories(wrong):
     cat = {}
     for w in wrong:
@@ -105,6 +113,7 @@ def categories(wrong):
 
     return cat
 
+#Returns dictionary of categories -> percent where sign of answer doesn't match
 def percent_category_missed(wrong,total):
     percent_missed = {}
     for key,value in total.iteritems():
