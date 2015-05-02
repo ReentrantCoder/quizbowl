@@ -21,19 +21,10 @@ from sklearn.feature_extraction.dict_vectorizer import DictVectorizer
 from sklearn.svm import SVR
 from errorAnalysis import *
 from sklearn import linear_model
+import copy
+from ratingApproach import *
 
-
-def load_data():
-
-    dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
-    train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
-
-    questions = QuestionFormat()
-    question_info = questions.generatorToDict((questions.deserialize("data/questions.csv")))
-
-    return train,test,question_info
-
-
+#Very simple way to identify hints
 def total_hints(text):
     
     count = 0
@@ -45,33 +36,76 @@ def total_hints(text):
 
     return count
 
-#Modified from features.py.  All the possible features of an question
-def example(question,train=True):
+#Position Examples
+def example_position(question,train=True):
     
-    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'hints': total_hints(question.questionText),'answer':question.questionAnswer.lower(),'fragment':question.getQuestionFragment()}
+    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'hints': total_hints(question.questionText),'answer':question.questionAnswer.lower()}
     
     if train:
-        target = question.position
+        #target = question.position
+        target = abs(question.position)
     else:
         target = 0 #unsurpervised, we don't know the info about our test set
     
     return feat_dict, target
 
 
-def all_examples(questions,train=True): #from feature.py all examples
+def all_examples_position(questions,train=True): #from feature.py all examples
     
     examples = []
     targets = []
     for q in questions:
         
         
-        (ex, tgt) = example(q,train)
+        (ex, tgt) = example_position(q,train)
         examples.append(ex)
         targets.append(tgt)
         
     return examples,targets
 
-class Featurizer:
+#Correctness Examples
+def example_correct(question,train=True):
+    
+    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'answer':question.questionAnswer.lower(),'hints': total_hints(question.questionText),'position':abs(question.position)}
+    
+    
+    
+    if train:
+        target = 1 if question.position>0 else -1
+    else:
+        target = 0
+    
+    return feat_dict, target
+
+
+def all_examples_correct(questions,train=True):
+    
+    examples = []
+    targets = []
+    for q in questions:
+        
+        
+        (ex, tgt) = example_correct(q,train)
+        examples.append(ex)
+        targets.append(tgt)
+    
+    return examples,targets
+
+##Featurizers##
+
+class Featurizer_position:
+    def __init__(self):
+        
+        self.vectorizer = DictVectorizer()
+    
+    
+    def train_feature(self, examples):
+        return self.vectorizer.fit_transform(examples)
+    
+    def test_feature(self, examples):
+        return self.vectorizer.transform(examples)
+
+class Featurizer_correct:
     def __init__(self):
         
         self.vectorizer = DictVectorizer()
@@ -84,79 +118,96 @@ class Featurizer:
         return self.vectorizer.transform(examples)
 
 
-def create_features():
-    train,test,question_info = load_data()
 
 if __name__ == '__main__':
     
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
     positions = [q.position for q in train]
-    print len(positions)
-    print len(train)
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.9, random_state=None)
 
-    
+    #For cross validation, change to test_size to 0.0 for learning on all the training data
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.4, random_state=None)
+
+
     questions = QuestionFormat()
     question_info = questions.generatorToDict((questions.deserialize("data/questions.csv")))
     
+
+    #Uncomment this to run full test
+    #X_test=test
     
+    store = copy.deepcopy(X_test) #copy to update position before learning correctness
+    store_train = copy.deepcopy(X_train)
 
+    feat_pos = Featurizer_position()
+    feat_cor = Featurizer_correct()
 
-    feat = Featurizer()
+    features_pos,position = all_examples_position(X_train,True);
+    features_cor,isCorrect = all_examples_correct(X_train,True);
+    train_pos = feat_pos.train_feature(features_pos)
+    train_cor = feat_cor.train_feature(features_cor)
 
-    features,position = all_examples(X_train,True);
-    t = feat.train_feature(features)
-    #feat.test_feature(y_train)
-    print len(X_train)
-    print len(features)
-    print len(y_train)
-    #print position
     
-    f_test,p_test = all_examples(X_test,False)
-    t_test = feat.test_feature(f_test)
-    #print features
-    #print X_train
-    #svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
-    #svr_lin = SVR(kernel='linear', C=1e3)
-    #svr_poly = SVR(kernel='poly', C=1e3, degree=2)
+    f_test,p_test = all_examples_position(X_test,False)
+    t_test = feat_pos.test_feature(f_test)
+
+    #Which model to use for regression to pick position
     #clf = linear_model.LinearRegression()
-    #clf = linear_model.Ridge (alpha = 0.05)
+    #clf = linear_model.Ridge (alpha = 0.005)
     clf = linear_model.Lasso(alpha = 0.1)
     
-    '''
-    y_rbf = svr_rbf.fit(t, y_train).predict(t_test)
-    predictions_rbf = []
-    predictions_lin = []
-    predictions_poly = []
-    for index,value in enumerate(y_rbf):
-        predictions_rbf.append({'id':X_test[index].id,'position': value})
-    compute_error_analysis(predictions_rbf,X_test,25)
-    '''
-    classifier = clf.fit(t, y_train)
-    y_lin = classifier.predict(t_test)
+    classifier_position = clf.fit(train_pos, position)
+    y_lin = classifier_position.predict(t_test)
+    y_lin_train = classifier_position.predict(train_pos)
+    
+    #Update the position in the test data once we have predicted it
+    new_test = [x for x in X_test]
+    for index,value in enumerate(y_lin):
+        new_test[index].position = value
+    
+    #Which model to use for regression to pick correctness
+    #Choose continuous over classifier
+        #because of harsh penalty for incorrect correctness prediction
+    #clf = linear_model.Lasso(alpha = 0.1)
+    clf = linear_model.Ridge (alpha = 5)
+    #clf = linear_model.LinearRegression()
+    #logreg = linear_model.LogisticRegression(C=10000)
+    #classifier_correct = logreg.fit(train_cor,isCorrect)
+
+    f_test_cor,p_test_cor = all_examples_correct(new_test,False)
+    t_test_cor = feat_cor.test_feature(f_test_cor)
+
+
+
+    classifier_correct = clf.fit(train_cor,isCorrect)
+    y_cor = classifier_correct.predict(t_test_cor)
+
     predictions_lin = []
     for index,value in enumerate(y_lin):
-        predictions_lin.append({'id':X_test[index].id,'position': value})
-    compute_error_analysis(predictions_lin,X_test,25)
-    #print predictions_lin
+        predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*abs(value)})
+    compute_error_analysis(predictions_lin,store,25)
+
 
     #Training Data
-    pred_train = classifier.predict(t)
-    predictions_lin = []
-    for index,value in enumerate(pred_train):
-        predictions_lin.append({'id':X_train[index].id,'position': value})
-    compute_error_analysis(predictions_lin,X_train,25)
+    print "Training Data"
+    new_train = [x for x in X_train]
+    for index,valye in enumerate(y_lin_train):
+        new_train[index].position = value
 
-    '''
-    y_poly = svr_poly.fit(t, y_train).predict(X_test)
-    for index,value in enumerate(y_poly):
-        predictions_poly.append({'id':X_test[index].id,'position': value})
-    compute_error_analysis(predictions_poly,X_test,25)
-    '''
+    f_train_cor,p_train_cor = all_examples_correct(new_train,False)
+    t_train_cor = feat_cor.test_feature(f_train_cor)
+
+    y_train_cor = classifier_correct.predict(t_train_cor)
+    
+    predictions_lin_train = []
+    for index,value in enumerate(y_lin_train):
+        predictions_lin_train.append({'id':X_train[index].id,'position': y_train_cor[index]*abs(value)})
+    compute_error_analysis(predictions_lin_train,store_train,25)
 
 
-
+#Output the guesses
+    fileFormat = GuessFormat()
+    fileFormat.serialize(predictions_lin, "data/guess222.csv")
 
 
 

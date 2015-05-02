@@ -40,9 +40,13 @@ def compute_error_analysis(predicted,actual,maxDiff):
     cat_off = categories(missedQuestions)
     cat_answer = categories(wrong_answer)
     all_cat = all_categories(actual)
+    r_w = right_wrong(predicted,actual)
+    w_r = wrong_right(predicted,actual)
     print "total questions"
     print len(predicted)
+    print "missed questions"
     print len(missedQuestions)
+    print "wrong answer"
     print len(wrong_answer)
     print "accuracy"
     print (1-(len(wrong_answer)/len(predicted)))*100
@@ -53,7 +57,29 @@ def compute_error_analysis(predicted,actual,maxDiff):
     print percent_category_missed(cat_off,all_cat,)
     print percent_category_missed(cat_answer,all_cat,)
     '''
+    print "mean squared error"
     print mse(predicted,actual)
+
+    print "predicted right actually wrong"
+    print r_w
+
+    print "predicted wrong actually right"
+    print w_r
+
+
+def right_wrong(predicted,actual):
+    i=0
+    for index,value in enumerate(predicted):
+        if value['position']>0 and actual[index].position<0:
+            i+=1
+    return i
+
+def wrong_right(predicted,actual):
+    i=0
+    for index,value in enumerate(predicted):
+        if value['position']<0 and actual[index].position>0:
+            i+=1
+    return i
 
 def mse(predicted,actual):
     
@@ -71,9 +97,9 @@ def position_off(predicted,actual,maxDiff):
         diff = abs(abs(value['position'])-abs(actual[index].position))
         if diff > maxDiff:
             missedQuestions.append((question_info[actual[index].questionId],diff))
-    print "total questions"
-    print len(predicted)
-    print(len(missedQuestions))
+#print "total questions"
+#    print len(predicted)
+#    print(len(missedQuestions))
     ordered = sorted(missedQuestions, key=lambda pos: pos[1])
     #print ordered[0]
     return ordered
