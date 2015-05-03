@@ -31,7 +31,8 @@ def total_hints(text):
         
     words = text.split()
     for (prev, next) in zip(words, words[1:]):
-        if prev.endswith(",") or prev.endswith(".") or prev.endswith(";") or prev.lower() in ["and", "or"]:
+        if prev.endswith(",") or prev.endswith(".") or prev.endswith(";"):
+            #or prev.lower() in ["and", "or"]:
             count += 1
 
     return count
@@ -66,7 +67,16 @@ def all_examples_position(questions,train=True): #from feature.py all examples
 #Correctness Examples
 def example_correct(question,train=True):
     
-    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'answer':question.questionAnswer.lower(),'hints': total_hints(question.questionText),'position':abs(question.position)}
+    #text = question.questionText.split()
+    #print len(text)
+    #lead_pos = int(abs(question.position))
+    #print lead_pos
+    #leading_word = text[lead_pos-1]
+   
+   #trailing_word = text[lead_pos-2]
+
+    
+    feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'answer':question.questionAnswer.lower(),'hints': total_hints(question.questionText),'position':abs(question.position)}#,'word':leading_word}#,'leading2':trailing_word}
     
     
     
@@ -118,6 +128,47 @@ class Featurizer_correct:
         return self.vectorizer.transform(examples)
 
 
+def process_known_users(train):
+    #map user id to tuple (question_answered, right,wrong)
+    user_map = {t.userId:[0,0,0] for t in train}
+    for t in train:
+        user_map[t.userId][0]+=1
+        if t.position < 0:
+            user_map[t.userId][2]+=1
+        else:
+            user_map[t.userId][1]+=1
+
+    return user_map
+
+#def process_known_questions(train):
+
+def get_known_users(train,cap):
+    users = set([])
+    for t in train:
+        if t.userId in cap:
+            users = users | set([t])
+    return users
+
+def process_known_questions(train):
+    #map question id to tuple (question_answered, right,wrong)
+    question_map = {t.questionId:[0,0,0] for t in train}
+    for t in train:
+        question_map[t.questionId][0]+=1
+        if t.position < 0:
+            question_map[t.questionId][2]+=1
+        else:
+            question_map[t.questionId][1]+=1
+
+    return question_map
+
+def get_known_questions(train,cap):
+    questions = set([])
+    for t in train:
+        if t.questionId in cap:
+            questions = questions | set([t])
+    return questions
+
+
 
 if __name__ == '__main__':
     
@@ -126,7 +177,9 @@ if __name__ == '__main__':
     positions = [q.position for q in train]
 
     #For cross validation, change to test_size to 0.0 for learning on all the training data
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.4, random_state=None)
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.0, random_state=None)
+    
+
 
 
     questions = QuestionFormat()
@@ -134,8 +187,24 @@ if __name__ == '__main__':
     
 
     #Uncomment this to run full test
-    #X_test=test
+    X_test=test
     
+    # Figure out what percent of users are in both train and test sets
+    A = set([ t.userId for t in X_train ])
+    B = set([ t.userId for t in X_test ])
+    cap = A.intersection(B)
+    
+    known_users = process_known_users(get_known_users(X_train,cap))
+    
+    C = set([ t.questionId for t in X_train ])
+    D = set([ t.questionId for t in X_test ])
+    cap_questions = C.intersection(D)
+    
+    known_questions = process_known_questions(get_known_questions(X_train,cap_questions))
+    
+    #print known_users
+    #exit(-1)
+                       
     store = copy.deepcopy(X_test) #copy to update position before learning correctness
     store_train = copy.deepcopy(X_train)
 
@@ -157,19 +226,24 @@ if __name__ == '__main__':
     clf = linear_model.Lasso(alpha = 0.1)
     
     classifier_position = clf.fit(train_pos, position)
+    print classifier_position.get_params()
     y_lin = classifier_position.predict(t_test)
     y_lin_train = classifier_position.predict(train_pos)
     
     #Update the position in the test data once we have predicted it
     new_test = [x for x in X_test]
     for index,value in enumerate(y_lin):
+        '''
+        if abs(value)>len(X_test[index].questionText.split()):
+            value = len(X_test[index].questionText.split())/2
+        '''
         new_test[index].position = value
     
     #Which model to use for regression to pick correctness
     #Choose continuous over classifier
         #because of harsh penalty for incorrect correctness prediction
     #clf = linear_model.Lasso(alpha = 0.1)
-    clf = linear_model.Ridge (alpha = 5)
+    clf = linear_model.Ridge (alpha = 7)
     #clf = linear_model.LinearRegression()
     #logreg = linear_model.LogisticRegression(C=10000)
     #classifier_correct = logreg.fit(train_cor,isCorrect)
@@ -183,26 +257,119 @@ if __name__ == '__main__':
     y_cor = classifier_correct.predict(t_test_cor)
 
     predictions_lin = []
+    total_change = 0
+    min = 10
+    max = 0
     for index,value in enumerate(y_lin):
+        user_id = X_test[index].userId
+        question_id = X_test[index].questionId
+        total_change_old = total_change
+        
+        if known_users.has_key(user_id):
+            info = known_users[user_id]
+            if info[2]/info[0] > 0.3 and y_cor[index]>0:
+                y_cor[index] = -1#*y_cor[index]
+                total_change+=1
+            elif info[1]/info[0] > 0.5 and y_cor[index]<0:
+                y_cor[index] = 1#-1*-y_cor[index]
+                total_change+=1
+        
+        
+        if known_questions.has_key(question_id) and total_change_old==total_change:
+            info = known_questions[question_id]
+            if info[2]/info[0] > 0.5 and y_cor[index]>0:
+                y_cor[index] = -1*-y_cor[index]
+                total_change+=1
+            
+            elif info[1]/info[0] > 0.5 and y_cor[index]<0:
+                y_cor[index] = -1*-y_cor[index]
+                total_change+=1
+        
+        
+
+        '''
+        v = abs(value)/len(X_test[index].questionText.split())
+        if v>max:
+            max=v
+        if v<min:
+            min =v
+        if abs(value)/len(X_test[index].questionText.split()) < 0.72 and y_cor[index]>0:
+            y_cor[index] = -y_cor[index]
+            total_change+=1
+        '''
         predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*abs(value)})
-    compute_error_analysis(predictions_lin,store,25)
+    #compute_error_analysis(predictions_lin,store,50)
+
+    print "total change"
+    print total_change
+    print max
+    print min
 
 
     #Training Data
     print "Training Data"
     new_train = [x for x in X_train]
-    for index,valye in enumerate(y_lin_train):
+    for index,value in enumerate(y_lin_train):
+        '''
+        if abs(value)>len(X_train[index].questionText.split()):
+            value = len(X_train[index].questionText.split())/2
+        '''
         new_train[index].position = value
 
     f_train_cor,p_train_cor = all_examples_correct(new_train,False)
     t_train_cor = feat_cor.test_feature(f_train_cor)
 
     y_train_cor = classifier_correct.predict(t_train_cor)
-    
+
+    total_change_t = 0
+    min_t = 10
+    max_t = 0
     predictions_lin_train = []
     for index,value in enumerate(y_lin_train):
+        user_id = X_train[index].userId
+        question_id = X_train[index].questionId
+        total_change_t_old = total_change_t
+        
+        if known_users.has_key(user_id):
+            info = known_users[user_id]
+            if info[2]/info[0] > 0.3 and y_train_cor[index]>0:
+                y_train_cor[index] = -1#*y_train_cor[index]
+                total_change_t+=1
+            elif info[1]/info[0] > 0.5 and y_train_cor[index]<0:
+                y_train_cor[index] = 1#-1*-y_train_cor[index]
+                total_change_t+=1
+
+
+        if known_questions.has_key(question_id) and total_change_t_old==total_change_t:
+            info = known_questions[question_id]
+            if info[2]/info[0] > 0.5 and y_train_cor[index]>0:
+                y_train_cor[index] = -1*y_train_cor[index]
+                total_change_t+=1
+            
+            elif info[1]/info[0] > 0.5 and y_train_cor[index]<0:
+                y_train_cor[index] = -1*y_train_cor[index]
+                total_change_t+=1
+        
+        
+
+        '''
+        v = abs(value)/len(X_train[index].questionText.split())
+        if v>max_t:
+            max_t=v
+        if v<min_t:
+            min_t =v
+        if abs(value)/len(X_train[index].questionText.split()) > 0.72 and y_train_cor[index]>0:
+            y_train_cor[index] = -y_train_cor[index]
+        '''
         predictions_lin_train.append({'id':X_train[index].id,'position': y_train_cor[index]*abs(value)})
-    compute_error_analysis(predictions_lin_train,store_train,25)
+        
+    compute_error_analysis(predictions_lin_train,store_train,50)
+
+    print "total change"
+    print total_change_t
+    print max_t
+    print min_t
+
 
 
 #Output the guesses
