@@ -73,11 +73,11 @@
 
 \section*{Problem}
 
-\paragraph{} Contestants in a quiz bowl may answer a question as it is being read by buzzing in. We wish to predict when this will happen so that an artificial agent will buzz in just before other contestants. We treat this as two separate problems 1) at what point in the question will the user buzz in, and 2) will user answer correctly. Correctly answered positions will be reported with a positive sign, and incorrectly negatively. We measure (1) by root mean square error (RMSE) and (2) by sign accuracy (ACC).
+\paragraph{} Contestants in a quiz bowl may answer a question as it is being read by buzzing in. We wish to predict when this will happen so that an artificial agent will buzz in just before other contestants. We treat this as two separate problems 1) at what point in the question will the user buzz in, and 2) will the user answer correctly. Correctly answered positions will be reported with a positive sign, and incorrectly negatively. We measure (1) by root mean square error (RMSE) and (2) by sign accuracy (ACC).
 
 \section*{Original Approach}
 
-\paragraph{} We originally proposed a user-dependent probabilistic model based on independence assumptions to pick the position with the highest probability given question features. Using logistic regression we found the approach slow and inaccurate (RMSE 106). We pivoted in favor of two simpler parallel lines of work: the Expected Value approach and Right-Wrong approach.
+\paragraph{} We originally proposed a user-dependent probabilistic model based on independence assumptions to report the position with the highest probability given question features. Using logistic regression we found the approach slow and inaccurate (RMSE 106). We pivoted in favor of two simpler parallel lines of work: the Expected Value approach and Right-Wrong approach.
 
 \section*{Expected Value Approach}
 
@@ -99,7 +99,7 @@
 	\label{fig:expectedValue:errorAnalysis}
 \end{figure}
 
-\paragraph{} To improve RMSE, Garrett looked at the relationship between expected error and predicted position. Applying these error corrections to subsequent predictions produced RMSE of 84.39 and ACC of 73.02\%. Repeating the process three more times yielded RMSE of 83.73 and 72.65\%. Next, he looked at the most frequently reported position, user rating, and question rating to apply further adjustments based on category to obtain RMSE of 83.25 and sign accuracy of 73.5\%.
+\paragraph{} To improve RMSE, Garrett looked at the relationship between expected error and predicted position. With the intent to zero expected error, he applied these errors as position corrections to produce RMSE of 84.39 and ACC of 73.02\%. Repeating the process three more times yielded RMSE of 83.73 and ACC of 72.65\%. Next, he looked at the most frequently reported position, user rating, and question rating to apply further corrections based on category to obtain RMSE of 83.25 and sign accuracy of 73.5\%.
 
 \begin{figure}[H]
 	\begin{center}
@@ -109,7 +109,7 @@
 	\label{fig:expectedValue:refinement}
 \end{figure}
 
-Finally, he automated this adjustment process as depicted in Fig. (\ref{fig:expectedValue:refinement}) by splitting the training set into four sets: two to initially fit and adjust the model, and two to verify adjustments reduced RMSE on two separate sets to mimic the Kaggle setup. An adjustment is applied to the model, if RMSE does not improve for both test sets, the adjustment is rejected, otherwise it is accepted, and the process continues until the adjustment set is exhausted. Result: RMSE of 82.11832 as our best Kaggle score until May 2\textsuperscript{nd}.
+Finally, he automated this adjustment process as depicted in Fig. (\ref{fig:expectedValue:refinement}) by splitting the training set into four sets: two to initially fit and adjust the model, and two to verify adjustments reduced RMSE on two separate sets to mimic the Kaggle setup. From the initial fit, examples from the adjustment set are used to make corrections to the model. If RMSE does not improve for both test sets, an adjustment is rejected, otherwise it is accepted, and the process continues until the adjustment set is exhausted. Result: RMSE of 82.11832 as our best Kaggle score until May 2\textsuperscript{nd}.
 
 \section*{Right-Wrong Approach}
 
