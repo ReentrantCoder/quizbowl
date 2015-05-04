@@ -66,7 +66,7 @@
 \begin{document}
 
 \title{CSCI-5622: When They Buzz}
-\author{Alex Gendreau \and Garrett Lewellen \and Tyler Behm}
+\author{Alex Gendreau \and Garrett Lewellen \and Tyler Behm \and a.k.a. Team Skynet}
 \date{May 7\textsuperscript{th}, 2015}
 
 \maketitle
@@ -113,14 +113,68 @@ Finally, he automated this adjustment process as depicted in Fig. (\ref{fig:expe
 
 \section*{Right-Wrong Approach}
 
-Tyler TODO (Sign, then position \& position then sign, features, error analysis)
+\paragraph{} Tyler was the first to realize that incorrectly predicting whether an answer was right or wrong has a higher penalty to the RMSE than the absolute value of the position. This is because of the bimodal distribution of answer positions. See Fig. \ref{fig:categoryPositions}.
+
+\begin{figure}[H]
+	\begin{center}
+		\resizebox{0.7\linewidth}{!}{\includegraphics{categoryPositions.png}}
+	\end{center}
+	\caption{Histogram of frequency of answers binned by answer positions and separated by category.}
+	\label{fig:categoryPositions}
+\end{figure}
+
+Thus right-wrong predictions warrant their own logistic regression classifier. The following plots motivate the effectiveness of the features. User id was not an effective feature. The histogram shows that most user ids answered few questions. See Fig. \ref{fig:userHisto}. Category was an effective feature. The bar graph shows that the literature category has an average position of twice that of mathematics. See Fig. \ref{fig:categoryAverages}. This could be because literature questions were answered later than math questions, because literature questions were answered correctly more often than math questions, or because of some combination of the two factors. 
+
+Later implementations of the right-wrong approach took the position prediction from the expected value approach as a feature. We tried using it vice-versa (right-wrong as feature into expected) but this was unsuccessful.
+
+
+
+\begin{figure}[H]
+	\begin{center}
+		\resizebox{0.7\linewidth}{!}{\includegraphics{histogram.png}}
+	\end{center}
+	\caption{Histogram of frequency of users binned by number of questions they answered.}
+	\label{fig:userHisto}
+\end{figure}
+
+\begin{figure}[H]
+	\begin{center}
+		\resizebox{0.7\linewidth}{!}{\includegraphics{categoryAverages.png}}
+	\end{center}
+	\caption{Bar graph of average answer position for each category.}
+	\label{fig:categoryAverages}
+\end{figure}
+
+The initial implementation of the right-wrong approach modified the original guess file. The original guess file predicted the mean of the training set (39.298062750052644) for all test values. By negating the sign for each prediction in this file, this first implementation by Tyler improved the team's public kaggle score to 84.27541 which was best so far for the team by April 14t\textsuperscript{th}.
+
+Alex helped with the analyser, and Garrett helped with the excel plots that motivated this approach.
+
+Tyler TODO (error analysis)
 
 \section*{Final Approach}
+
+\paragraph{} Because incorrectly predicting whether an answer was right or wrong has such a high penalty, we chose to explore a continuum of correctness predictions. This would allow us to hedge our bets based on how confident was the right-wrong classifier.
+
+\begin{verbatim}
+def hedge_bets(guess, conf, mean = 39.298062750052644):
+    ## diff is between 0 (no confidence) and 1 (high confidence)
+    ## it is the difference in probabilities for predicting yes and no, respectively
+    ## output is confidence-weight position guess
+    ## the less confident the guess, the more it is dragged towards the mean
+    diff = abs(conf[0] - conf[1]) 
+    return guess*diff + mean*(1 - diff)
+\end{verbatim}
+
+Tyler's first approach of this is shown in the code snippet above. It is a confidence-based linear interpolation towards the mean of the training set. If the right-wrong classifier was $100\%$ certain of its prediction, then the exact position classifier's prediction is returned. If the right-wrong classifier was evenly split between the right and wrong prediction, then the mean is returned. This reduces our risk of increasing the RMSE for low confidence right-wrong predictions.
+
+Alex successfully implemented a better version of this by using lasso regression.
+
+Alex's final model scored the highest for our team and was our final submission.
 
 Alex TODO (Hedge bets, continuous yes/no sign prediction, features, error analysis)
 
 \section*{Conclusions}
 
-\paragraph{} Sunday we obtained our best score of 81.55246 based on the final approach. ...
+\paragraph{} On the public leaderboard, our team placed 4th among 10 teams with a score of 81.55. On the private leaderboard, our team placed 5th with a score of 82.98. Our drop in rank from public to private indicates some degree of overtraining on the public test data.
 
 \end{document}
