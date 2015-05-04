@@ -115,6 +115,9 @@ class Featurizer_position:
     def test_feature(self, examples):
         return self.vectorizer.transform(examples)
 
+    def get_features(self):
+        return self.vectorizer.get_feature_names()
+
 class Featurizer_correct:
     def __init__(self):
         
@@ -126,6 +129,9 @@ class Featurizer_correct:
     
     def test_feature(self, examples):
         return self.vectorizer.transform(examples)
+
+    def get_features(self):
+        return self.vectorizer.get_feature_names()
 
 
 def process_known_users(train):
@@ -177,7 +183,7 @@ if __name__ == '__main__':
     positions = [q.position for q in train]
 
     #For cross validation, change to test_size to 0.0 for learning on all the training data
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.0, random_state=None)
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.4, random_state=None)
     
 
 
@@ -187,9 +193,10 @@ if __name__ == '__main__':
     
 
     #Uncomment this to run full test
-    X_test=test
+    #X_test=test
     
     # Figure out what percent of users are in both train and test sets
+    '''
     A = set([ t.userId for t in X_train ])
     B = set([ t.userId for t in X_test ])
     cap = A.intersection(B)
@@ -201,7 +208,7 @@ if __name__ == '__main__':
     cap_questions = C.intersection(D)
     
     known_questions = process_known_questions(get_known_questions(X_train,cap_questions))
-    
+    '''
     #print known_users
     #exit(-1)
                        
@@ -215,6 +222,8 @@ if __name__ == '__main__':
     features_cor,isCorrect = all_examples_correct(X_train,True);
     train_pos = feat_pos.train_feature(features_pos)
     train_cor = feat_cor.train_feature(features_cor)
+    features_position = feat_pos.get_features()
+    features_correct = feat_cor.get_features()
 
     
     f_test,p_test = all_examples_position(X_test,False)
@@ -226,24 +235,31 @@ if __name__ == '__main__':
     clf = linear_model.Lasso(alpha = 0.1)
     
     classifier_position = clf.fit(train_pos, position)
-    print classifier_position.get_params()
+    
+    matter_position = []
+    for index,c in enumerate(classifier_position.coef_):
+        if c > 0.0001 or c<-0.0001:
+            matter_position.append([index,c])
+
+    matter_correct = []
+    for index,c in enumerate(classifier_position.coef_):
+        if c > 0.0001 or c<-0.0001:
+            matter_correct.append([index,c])
+
+    #print classifier_position.get_params()
     y_lin = classifier_position.predict(t_test)
     y_lin_train = classifier_position.predict(train_pos)
     
     #Update the position in the test data once we have predicted it
     new_test = [x for x in X_test]
     for index,value in enumerate(y_lin):
-        '''
-        if abs(value)>len(X_test[index].questionText.split()):
-            value = len(X_test[index].questionText.split())/2
-        '''
         new_test[index].position = value
     
     #Which model to use for regression to pick correctness
     #Choose continuous over classifier
         #because of harsh penalty for incorrect correctness prediction
     #clf = linear_model.Lasso(alpha = 0.1)
-    clf = linear_model.Ridge (alpha = 7)
+    clf = linear_model.Ridge (alpha = 5)
     #clf = linear_model.LinearRegression()
     #logreg = linear_model.LogisticRegression(C=10000)
     #classifier_correct = logreg.fit(train_cor,isCorrect)
@@ -261,6 +277,7 @@ if __name__ == '__main__':
     min = 10
     max = 0
     for index,value in enumerate(y_lin):
+        '''
         user_id = X_test[index].userId
         question_id = X_test[index].questionId
         total_change_old = total_change
@@ -285,7 +302,7 @@ if __name__ == '__main__':
                 y_cor[index] = -1*-y_cor[index]
                 total_change+=1
         
-        
+        '''
 
         '''
         v = abs(value)/len(X_test[index].questionText.split())
@@ -298,13 +315,14 @@ if __name__ == '__main__':
             total_change+=1
         '''
         predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*abs(value)})
-    #compute_error_analysis(predictions_lin,store,50)
+    compute_error_analysis(predictions_lin,store,25)
 
+    '''
     print "total change"
     print total_change
     print max
     print min
-
+    '''
 
     #Training Data
     print "Training Data"
@@ -326,6 +344,7 @@ if __name__ == '__main__':
     max_t = 0
     predictions_lin_train = []
     for index,value in enumerate(y_lin_train):
+        '''
         user_id = X_train[index].userId
         question_id = X_train[index].questionId
         total_change_t_old = total_change_t
@@ -349,7 +368,7 @@ if __name__ == '__main__':
             elif info[1]/info[0] > 0.5 and y_train_cor[index]<0:
                 y_train_cor[index] = -1*y_train_cor[index]
                 total_change_t+=1
-        
+        '''
         
 
         '''
@@ -363,18 +382,30 @@ if __name__ == '__main__':
         '''
         predictions_lin_train.append({'id':X_train[index].id,'position': y_train_cor[index]*abs(value)})
         
-    compute_error_analysis(predictions_lin_train,store_train,50)
+    compute_error_analysis(predictions_lin_train,store_train,25)
 
+
+#Feature Data
+    print "Position"
+    for i in matter_position:
+        print i[1],features_position[i[0]]
+   
+    print "Correct"
+    for i in matter_correct:
+        print i[1],features_correct[i[0]]
+
+
+    '''
     print "total change"
     print total_change_t
     print max_t
     print min_t
-
+    '''
 
 
 #Output the guesses
-    fileFormat = GuessFormat()
-    fileFormat.serialize(predictions_lin, "data/guess222.csv")
+#fileFormat = GuessFormat()
+#    fileFormat.serialize(predictions_lin, "data/guess222.csv")
 
 
 

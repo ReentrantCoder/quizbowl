@@ -26,12 +26,18 @@ from numpy import sign,sqrt,mean,power,average
 
 import fileFormats
 import data
+from questionBased import *
 
 questions = QuestionFormat()
 question_info = questions.generatorToDict((questions.deserialize("data/questions.csv")))
 
 #Assume actual in TrainingData Format
 #Assume predicted is a dictionary of the form {"id": id, "position": predicted position}
+
+def print_dictionary(dic):
+    for (k,v) in dic.iteritems():
+        print str(k) + " -> " + str(v)
+
 
 
 def compute_error_analysis(predicted,actual,maxDiff):
@@ -42,29 +48,50 @@ def compute_error_analysis(predicted,actual,maxDiff):
     all_cat = all_categories(actual)
     r_w = right_wrong(predicted,actual)
     w_r = wrong_right(predicted,actual)
-    print "total questions"
-    print len(predicted)
-    print "missed questions"
-    print len(missedQuestions)
-    print "wrong answer"
-    print len(wrong_answer)
+    #print "total questions"
+    #print len(predicted)
+    #print "missed questions"
+    #print len(missedQuestions)
+    #print "wrong answer"
+    #print len(wrong_answer)
     print "accuracy"
     print (1-(len(wrong_answer)/len(predicted)))*100
-    '''
-    print cat_off
-    print cat_answer
-    print all_cat
-    print percent_category_missed(cat_off,all_cat,)
-    print percent_category_missed(cat_answer,all_cat,)
-    '''
+    
+    print "All categories"
+    print_dictionary(all_cat)
+
+    print "Position off"
+    #print print_dictionary(percent_category_missed(cat_off,all_cat))
+    print "Answer off"
+    print_dictionary(percent_category_missed(cat_answer,all_cat))
+    
     print "mean squared error"
-    print mse(predicted,actual)
+    mse_,max_bad = mse(predicted,actual)
+    print mse_
+    for m in max_bad[-5:]:
+        print m[1][0].questionCategory
+    #exit(-1)
+    #print max_bad[1][0].questionCategory
+    #print max_bad[1][1]
 
     print "predicted right actually wrong"
-    print r_w
+    print (r_w/len(predicted))*100
 
     print "predicted wrong actually right"
-    print w_r
+    print (w_r/len(predicted))*100
+
+    print "questions right/wrong"
+    my_dict = categories_right_wrong(actual,all_cat)
+    print_dictionary(my_dict)
+
+    dict_to_csv("test.csv",my_dict)
+
+
+def dict_to_csv(fileName,my_dict):
+    with open(fileName, 'wb') as outfile:  # Just use 'w' mode in 3.x
+        writer = csv.writer(outfile)
+        writer.writerow(my_dict.keys())
+        writer.writerows(zip(*my_dict.values()))
 
 
 def right_wrong(predicted,actual):
@@ -82,8 +109,18 @@ def wrong_right(predicted,actual):
     return i
 
 def mse(predicted,actual):
+    squares = []
+    max_bad = []
+    for index,value in enumerate(actual):
+        how_bad = pow(predicted[index]["position"] - (value.position), 2)
+        squares.append(how_bad)
+        max_bad.append((how_bad,(value,predicted[index])))
     
-    return sqrt(average(map(lambda (a,b): pow(a["position"] - (b.position), 2), zip(predicted, actual))))
+    
+
+    return sqrt(average(squares)),sorted(max_bad, key=lambda tup: tup[0])
+    
+#return sqrt(average(map(lambda (a,b): pow(a["position"] - (b.position), 2), zip(predicted, actual))))
 
 #Returns Ordered List of question,error_posstion pairs
 #error_position: how far off we are in terms of absolute value of predicted position
@@ -126,6 +163,54 @@ def all_categories(actual):
             cat[key]+=1
         else:
             cat[key]=1
+    return cat
+
+#Returns dictionary of categories -> percent right, percent wrong, average questoin length, number of hints, average right position, average wrong position
+def categories_right_wrong(actual,all):
+    cat = {}
+    for a in actual:
+        key = question_info[a.questionId]['category']
+        #print key
+        if cat.has_key(key):
+            cat[key][2]+=len(a.questionText.split())
+            cat[key][3]+=total_hints(a.questionText)
+            if a.position > 0:
+                cat[key][0]+=1
+                cat[key][4]+=a.position
+            
+            else:
+                cat[key][1]+=1
+                cat[key][5]+=a.position
+        else:
+            if a.position > 0:
+                cat[key]=[1,0,len(a.questionText.split()),total_hints(a.questionText),
+                          a.position,0]
+            else:
+                cat[key]=[1,0,len(a.questionText.split()),total_hints(a.questionText),
+                          0,a.position]
+    print_dictionary(cat)
+    right = 0
+    wrong = 0
+    right_answer=0
+    wrong_answer=0
+    question_length=0
+    hints = 0
+    total = 0
+    for (k,v) in cat.iteritems():
+        cat[k] = [(v[0]/(v[0]+v[1]))*100,(v[1]/(v[0]+v[1]))*100,v[2]/all[k],
+                  v[3]/all[k],v[4]/all[k],v[5]/all[k]]
+        right+=v[0]
+        wrong+=v[1]
+        question_length+=v[2]
+        hints+=v[3]
+        right_answer+=v[4]
+        wrong_answer+=v[5]
+        total+=all[k]
+
+    cat['TOTAL']=[(right/(right+wrong))*100,(wrong/(right+wrong))*100,question_length/total,
+                  hints/total,right_answer/total,
+                  wrong_answer/total]
+                  
     return cat
 
 #Returns dictionary of categories -> sign of answers don't match
