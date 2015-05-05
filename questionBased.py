@@ -43,7 +43,7 @@ def example_position(question,train=True):
     feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'hints': total_hints(question.questionText),'answer':question.questionAnswer.lower()}
     
     if train:
-        #target = question.position
+    #target = question.position
         target = abs(question.position)
     else:
         target = 0 #unsurpervised, we don't know the info about our test set
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     positions = [q.position for q in train]
 
     #For cross validation, change to test_size to 0.0 for learning on all the training data
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.4, random_state=None)
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, positions, test_size=0.0, random_state=None)
     
 
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     
 
     #Uncomment this to run full test
-    #X_test=test
+    X_test=test
     
     # Figure out what percent of users are in both train and test sets
     '''
@@ -315,7 +315,8 @@ if __name__ == '__main__':
             total_change+=1
         '''
         predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*abs(value)})
-    compute_error_analysis(predictions_lin,store,25)
+        #predictions_lin.append({'id':X_test[index].id,'position': value})
+    #compute_error_analysis(predictions_lin,store,25)
 
     '''
     print "total change"
@@ -404,8 +405,8 @@ if __name__ == '__main__':
 
 
 #Output the guesses
-#fileFormat = GuessFormat()
-#    fileFormat.serialize(predictions_lin, "data/guess222.csv")
+    fileFormat = GuessFormat()
+    fileFormat.serialize(predictions_lin, "data/guessFinalNo12.csv")
 
 
 
