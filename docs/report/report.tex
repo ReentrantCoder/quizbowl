@@ -77,7 +77,7 @@
 
 \section{Problem}
 
-\paragraph{} Contestants in a quiz bowl may answer a question as it is being read by buzzing in. We wish to predict when this will happen so that an artificial agent will buzz in just before other contestants. We treat this as two separate problems 1) at what point in the question will the user buzz in, and 2) will the user answer correctly. Correctly answered positions will be reported with a positive sign, and incorrectly negatively. We measure (1) by root mean square error (RMSE) and (2) by sign accuracy (ACC).
+\paragraph{} Contestants in a quiz bowl may answer a question as it is being read by buzzing in. Our goal is to predict when this will happen so that an artificial agent will buzz in just before other contestants. We treat this as two separate problems 1) at what point in the question will the user buzz in, and 2) will the user answer correctly. Correctly answered positions will be reported with a positive sign, and incorrectly negatively. We measure (1) by root mean square error (RMSE) and (2) by sign accuracy (ACC).
 
 \section{Original Approach}
 
@@ -93,7 +93,7 @@
 	\label{fig:expectedValue}
 \end{figure}
 
-\paragraph{} Garrett's simplest approach reported the expected position based on category, user rating, and question rating as depicted in Fig. (\ref{fig:expectedValue}). Users' abilities are measured by the portion of questions they answer correctly denoted by an integer value in $[-7, 7]$. Questions' difficulties are similar, but measured by portion of users who answer them correctly denoted by an integer in $[-2, 2]$. Garrett believed these features ultimately influenced the resulting sign and position. Result: RMSE of 87.48 and ACC of 72.50\%.
+\paragraph{} Garrett's simplest approach reported the expected position based on category, user rating, and question rating as depicted in Figure \ref{fig:expectedValue}. Users' abilities are measured by the portion of questions they answer correctly denoted by an integer value in $[-7, 7]$. Questions' difficulties are similar, but measured by portion of users who answer them correctly denoted by an integer in $[-2, 2]$. Garrett believed these features ultimately influenced the resulting sign and position. Result: RMSE of 87.48 and ACC of 72.50\%.
 
 \begin{figure}[H]
 	\begin{center}
@@ -113,11 +113,11 @@
 	\label{fig:expectedValue:refinement}
 \end{figure}
 
-Finally, he automated this adjustment process as depicted in Fig. (\ref{fig:expectedValue:refinement}) by splitting the training set into four sets: two to initially fit and adjust the model, and two to verify adjustments reduced RMSE on two separate sets to mimic the Kaggle setup. From the initial fit, examples from the adjustment set are used to make corrections to the model. If RMSE does not improve for both test sets, an adjustment is rejected, otherwise it is accepted, and the process continues until the adjustment set is exhausted. Result: RMSE of 82.11832 as our best Kaggle score until May 2\textsuperscript{nd}.
+Finally, he automated this adjustment process as depicted in Figure \ref{fig:expectedValue:refinement} by splitting the training set into four sets: two to initially fit and adjust the model, and two to verify adjustments reduced RMSE on two separate sets to mimic the Kaggle setup. From the initial fit, examples from the adjustment set are used to make corrections to the model. If RMSE does not improve for both test sets, an adjustment is rejected, otherwise it is accepted, and the process continues until the adjustment set is exhausted. Result: RMSE of 82.11832 as our best Kaggle score until May 2\textsuperscript{nd}.
 
 \section{Right-Wrong Approach}
 
-\paragraph{} Tyler was the first to realize that incorrectly predicting whether an answer was right or wrong has a higher penalty to the RMSE than the absolute value of the position. This is because of the bimodal distribution of answer positions. See Fig. \ref{fig:categoryPositions}.
+\paragraph{} Tyler realized that incorrectly predicting whether an answer was right or wrong has a higher penalty to the RMSE than the absolute value of the position. This is because of the bimodal distribution of answer positions. See Figure \ref{fig:categoryPositions}.
 
 
 \begin{figure}[H]
@@ -128,13 +128,13 @@ Finally, he automated this adjustment process as depicted in Fig. (\ref{fig:expe
 	\label{fig:categoryPositions}
 \end{figure}
 
-Thus, right-wrong predictions warrant their own logistic regression classifier. The following plots motivate the effectiveness of the features. User id was not an effective feature. The histogram shows that most user ids answered few questions. See Fig. \ref{fig:userHisto}. Category was an effective feature. The bar graph shows that the literature category has an average position of twice that of mathematics. See Fig. \ref{fig:categoryAverages}. This could be because literature questions were answered later than math questions, because literature questions were answered correctly more often than math questions, or because of some combination of the two factors. 
+Thus, right-wrong predictions warrant their own logistic regression classifier. The following plots motivate the effectiveness of the features. User id was not an effective feature. The histogram shows that most user ids answered few questions. See Figure \ref{fig:userHisto}. Category was an effective feature. The bar graph shows that the literature category has an average position of twice that of mathematics. See Figure\ref{fig:categoryAverages}. This could be because literature questions were answered later than math questions, because literature questions were answered correctly more often than math questions, or because of some combination of the two factors. 
 
 The initial implementation of the right-wrong approach modified the original guess file. The original guess file predicted the mean of the training set (39.298062750052644) for all test values. By negating the sign for each prediction in this file, this first implementation by Tyler improved the team's public Kaggle score to 84.27541 which was best so far for the team by April 14\textsuperscript{th}.
 
 Later implementations of the right-wrong approach took the position prediction from the expected value approach as a feature. We tried using it vice-versa (right-wrong as feature into expected) but this was unsuccessful.
 
-The right-wrong approach contributed to the improvements of future models. We used the right-wrong and expected approach to make a combined approach that earned a kaggle score of 86.94926 on April 30\textsuperscript{th}. This indicated that further efforts and innovations were needed to integrate these two models. This innovation was the continuum of correctness approach of which the right-wrong approach was the predecessor. By separating the problem to be solved into sign and position, we were able to give the sign its own model. This allowed us to feed position into it as an additional predictor and to tailor the regression learning specifically to the prediction of correctness. Thus, this approach improved the RMSE of our final model.
+The right-wrong approach contributed to the improvements of future models. We used the right-wrong and expected approach to make a combined approach that earned a Kaggle score of 86.94926 on April 30\textsuperscript{th}. This indicated that further efforts and innovations were needed to integrate these two models. This innovation was the continuum of correctness approach of which the right-wrong approach was the predecessor. By separating the problem to be solved into sign and position, we were able to give the sign its own model. This allowed us to feed position into it as an additional predictor and to tailor the regression learning specifically to the prediction of correctness. Thus, this approach improved the RMSE of our final model.
 
 
 
@@ -174,15 +174,15 @@ def hedge_bets(guess, conf, mean = 39.298062750052644):
 
 Tyler's first approach of this is shown in the code snippet above. It is a confidence-based linear interpolation towards the mean of the training set. If the right-wrong classifier was $100\%$ certain of its prediction, then the exact position classifier's prediction is returned. If the right-wrong classifier was evenly split between the right and wrong prediction, then the mean is returned. This reduces our risk of increasing the RMSE for low confidence right-wrong predictions.
 
-Continuing with the approach above, Alex approached the problem of predicting the position and correctness of the answer as two separate sub problems.  First she learns the positions and then using the learned position as an additional feature, she learns the correctness.  
+Continuing with the approach above, Alex approached the problem of predicting the absolute position and correctness of the answer as two separate sub problems.  First she learns the absolute positions and then using the learned position as an additional feature, she learns the correctness.  
 
-From the previous models two particular issues came to our attention
+From our experience working with the two previous models, two issues came to our attention
 \begin{enumerate}
 \item Overfitting of the training data
 \item Harsh penalty for predicting the wrong correctness value as mentioned above
 \end{enumerate}
 
-To counteract the first issue, Alex decided to remove the user id and question id as features and return to a simpler model that used only information contained in the question to predict the position to prevent overfitting of the training data.  For more information as this model, see Section~\ref{sec:pp}.  To counteract the second issue, she decided that while correctness is a categorical variable, the model does not have to treat it as one especially since the current model is not especially good a predicting the correctness.  Building on the "hedging our bets" approach as described above, she chose to predict the confidence in the correctness on a sliding scale from $[-1,1]$.  For more information on this approach, see Section ~\ref{sec:pc}.
+To counteract the first issue, Alex decided to remove the user id and question id as features and return to a simpler model that used only information contained in the question to predict the position to prevent overfitting of the training data.  For more information as this model, see Section~\ref{sec:pp}.  To counteract the second issue, she decided that while correctness is a categorical variable, the model does not have to treat it as one.  Building on the "hedging our bets" approach as described above, she chose to predict the confidence in the correctness on a sliding scale from $[-1,1]$.  For more information on this approach, see Section ~\ref{sec:pc}.
 
 \subsection{Predicting Position}
 \label{sec:pp}
@@ -193,7 +193,7 @@ To counteract the first issue, Alex decided to remove the user id and question i
 \item Correct Answer
 \item Number of Hints
 \end{itemize}
-The first three features are given in the question text, but the hints are a feature that we defined ourselves.  From examining the data, we noticed that each question is phrased similarly (a set of facts (or hints) describing the answer that are separated by punctuation or conjunctions (and, or).  An answer is usually given following a hint.  We currently have a rudimentary way of predicting the total number of hints in the question.  We count the number of words each sentence that are proceeded by punctuation or conjunctions.  The method of predicting hints proved useful in predicting the position (one of the top five features), see Figure 8.  This method could potentially be refined into a better feature.
+The first three features are given in the question text, but the hints are a feature that Garrett developed.  From examining the data, we noticed that each question is phrased similarly (a set of facts (or hints) describing the answer that are separated by punctuation or conjunctions (and, or).  An answer is usually given following a hint.  We currently have a rudimentary way of predicting the total number of hints in the question.  We count the number of words each sentence that are proceeded by punctuation or conjunctions.  The method of predicting hints proved useful in predicting the position (one of the top five features), see Figure 8.  
 
 \lstset{
   basicstyle=\itshape
@@ -203,19 +203,21 @@ To convert the categorical features of category and correct answer into numerica
 
 \subsection{Predicting Correctness Continuum}
 \label{sec:pc}
-\paragraph{} After predicting the absolute answer position, we need to determine the correctness of the answer.  Since incorrect predictions contribute significantly to the RMSE, Alex decided to predict the confidence in as a number between $[-1,1]$ and the multiply the predicted absolute position by this confidence to determine the final position/correctness prediction.  Ideally if the model is 100\% certain in the correctness then the position will only change in sign based on correctness.  However as is the case with most questions, the model is not certain in the correctness by multiplying the position by a number less than one, the position moves closer to 0 and thus decreases the penalty for an incorrect correctness prediction.  For this model, the same features were used as those to predict the absolute position in Section ~\ref{sec:pp} with the addition of the absolute position as a feature.  The targets are $\pm 1$.
+\paragraph{} After predicting the absolute answer position, we need to determine the correctness of the answer.  Since incorrect predictions contribute significantly to the RMSE, Alex decided to predict the confidence as a number between $[-1,1]$ and the multiply the predicted absolute position by this confidence to determine the final position/correctness prediction.  Ideally if the model is 100\% certain in the correctness then the position will only change in sign based on correctness.  By multiplying the position by a number less than one, the position moves closer to 0 and thus decreases the penalty for an incorrect correctness prediction.  For this model, the same features were used as those to predict the absolute position in Section ~\ref{sec:pp} with the addition of the absolute position as a feature.  The targets are $\pm 1$.
 
-Since the goal was to predict continuous output that represents the confidence of the correctness prediction, Alex again chose to use a regression model.  Similar to predicting the absolute position, she experimented with linear, lasso, and ridge regression while varying the $\alpha$ parameters by factors of $10$ for lasso and ridge regression.  She found that ridge regression with $\alpha=5$ minimized the RMSE on the cross validation set as described in Section ~\ref{sec:pp}.  Ridge regression prevents any feature from contributing a large factor to the final results.  While this proved the best model on the training data, it suffers from overfitting issues that are discussing in Section ~\ref{sec:micro}.
+Since the goal was to predict continuous output that represents the confidence of the correctness prediction, Again a regression model was chosen.  She found that ridge regression with $\alpha=5$ minimized the RMSE on the cross validation set as described in Section ~\ref{sec:pp}.  Ridge regression prevents any feature from contributing a large factor to the final results.  While this proved the best model on the training data, it suffers from overfitting issues that are discussing in Section ~\ref{sec:micro}.
 
-The two part model described above produced the best Kaggle score and was the final submission for our team.  For an illustration of correctness continuum, see Figure \ref{fig:corr_cont}.  
+The two part model described above produced the best Kaggle score and was the final submission for our team.  
 
-\begin{figure}[H]
-	\begin{center}
-		\resizebox{0.7\linewidth}{!}{\includegraphics{correctness_cont.png}}
-	\end{center}
-	\caption{The difference in position based on using logistic regression for modeling the correctness (Discrete) and ridge regression (continuous).}
-	\label{fig:corr_cont}
-\end{figure}
+%For an illustration of correctness continuum, see Figure \ref{fig:corr_cont}.  This is a stacked bar graph which shows that the predicted position of almost all training questions decreased from applying the correctness continuum.  We expect this since we are not confident in the ability of the classifier to predict the accuracy of the question.  By decreasing the predicted position, we are penalizing ourselves less for incorrect correctness predictions, which improves our RMSE.  
+
+%\begin{figure}[H]
+%	\begin{center}
+%		\resizebox{0.7\linewidth}{!}{\includegraphics{correctness_cont.png}}
+%	\end{center}
+%	\caption{The difference in position based on using logistic regression for modeling the correctness (Discrete) and ridge regression (continuous).}
+%	\label{fig:corr_cont}
+%\end{figure}
 
 \section{Error analysis}
 \paragraph{} Error analysis occurs at two different levels.  The macro level, Section ~\ref{sec:macro}, examines error on the entire data set or large subcategories to determine how well the model predicts the data on average.  The micro level, Section ~\ref{sec:micro}, examines why the model is especially bad at predicting certain examples.  Both of these error analyses can aid in determining the most influential features and provide guidance in developing new features.  
@@ -276,9 +278,9 @@ Total Hints (-0.17) \\ \hline
 \subsection{Macro Level}
 \label{sec:macro}
 
-\paragraph{} We examine errors in both position and correctness.  In Figure \ref{fig:abs_off} which is average difference between absolute predicted position and absolute actual position by category.  Unfortunately this graph is not very telling since all the categories are similar in terms of difference.  From this we can see that category while good for predicting the position is not causing significant error in one category.
+\paragraph{} We examine errors in both position and correctness.  In Figure \ref{fig:abs_off} the average difference between absolute predicted position and absolute actual position by category is depicted.  Unfortunately this graph is not very telling since all the categories are similar in terms of difference.  From this we can see that category while good for predicting the position is not causing significant error in one category.
 
-We now turn to correctness, which was the main focus of a lot of our efforts since it was such a large factor of the RMSE.  In Figure \ref{fig:corr_off}, we see the percent of questions that are incorrectly predicted correct/incorrect by category.  Here we do see some trends such as Earth Science and Mathematics are more likely to have incorrect correctness predictions whereas Literature and Other are more likely to have correct correctness answers.  Since we in general are predicting more significantly more false positives than false negatives, see Figure 9.  This could lead to us adding more weight to the Mathematics category that favors incorrect answers.  
+We now turn to correctness, which was the main focus of a lot of our efforts since it was such a large factor of the RMSE.  In Figure \ref{fig:corr_off}, we see the percent of questions that are incorrectly predicted correct/incorrect by category.  Here we do see some trends such as Earth Science and Mathematics are more likely to have incorrect correctness predictions whereas Literature and Other are more likely to have correct correctness answers.  Since we are predicting more false positives than false negatives, see Figure 9, this could lead to increasing the negative feature weight of Mathematics, for example.
 
 
 %\begin{figure}[H]
@@ -307,17 +309,12 @@ We now turn to correctness, which was the main focus of a lot of our efforts sin
 
 \subsection{Micro Level}
 \label{sec:micro}
-\paragraph{} For the micro level analysis we examine two specific questions that contribute large values to our RMSE.  First we examine an example where the absolute position from stage 1 of the position/correctness prediction, see Figure 12 and Table 1.  Here the issue is that the question was answered incorrectly (on average smaller position than correct answer) and the question was longer than average for fine arts questions.  The increased length plus the smaller incorrect answer lead to the position predicted to be too large.  One thing to take away from this is that potentially predicting absolute position is not the best way to go since correctness can effect the relative position. 
+\paragraph{} For the micro level analysis we examine two specific questions that contribute large values to our RMSE.  First we examine an example from stage 1 of the position/correctness prediction, see Figure 12 and Table 1.  Here the issue is that the question was answered incorrectly (on average a smaller position than the correct answers) and the question was longer than average for fine arts questions.  The increased length plus the smaller incorrect answer led to the predicted position to be too large.  One thing to take away from this is that predicting absolute position is not the best way to go since correctness can affect the relative position. 
 
-The false positives in terms of correctness are the largest factor in our RMSE.  This category is hard to predict since there are more correct questions than incorrect questions.  
+%The false positives in terms of correctness are the largest factor in our RMSE.  This category is hard to predict since there are more correct questions than incorrect questions.  
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\begin{minipage}[t]{.4\textwidth}
-%\begin{table}[tb]
-\centering
-\vspace{0pt}
-
 \begin{tabular}{|l|l |}
 \hline
 Category & Fine Arts \\ \hline
@@ -327,31 +324,23 @@ Predicted Position & 171.46 \\
 Actual Position & 46 (Incorrect) \\ \hline
 
 \end{tabular}
-\captionof{table}{The information for question 115661.}
+\caption{The information for question 115661: Micro Error Analysis of Fine Arts Question.}
+\end{table}
 \label{table:ex_art}
-%\end{table}
-\end{minipage}\hfill
-\begin{minipage}[t]{.4\textwidth}
+
+
+\begin{figure}[H]
 \centering
-\vspace{0pt}
-%\begin{figure}[H]
-\includegraphics[width=\textwidth]{finearts.png}
+\includegraphics[scale=0.5]{finearts.png}
 \caption{Breakdown of the training fine arts category}
 \label{fig:mircoFA}
-%\end{figure}
-\end{minipage}
-
 \end{figure}
 
-The next example Alex investigated is an example that contributes greatly to the overall RMSE in Table 2 and Figure 13.  This example is an example of an overfitting issue of our correctness model.  Since we include the correct answer as a feature, a question with the answer, Louis XI, appeared incorrectly in the training set whereas the user answered this question correctly.  However since the training data has this answer as incorrect with a relatively large weight ($-0.19$), the model is very unsure whether the answer is correct or not pushing the position near $0$. 
 
-\begin{figure}
-\centering
-\begin{minipage}[t]{.4\textwidth}
-%\begin{table}[tb]
-\centering
-\vspace{0pt}
+The next example Alex investigated is an example that contributes greatly to the overall RMSE in Table 2 and Figure 13.  This example is an example of an overfitting issue of our correctness model.  We include the correct answer as a feature, and a question with the answer, Louis XI, appeared incorrectly in the training set.  However the test user answered this question correctly.  Since this feature has a relatively large weight ($-0.19$), the model is unsure whether or not the answer is correct pushing the position near $0$. 
 
+\begin{table}[H]
+\centering
 \begin{tabular}{|l|l |}
 \hline
 Category & History \\ \hline
@@ -364,19 +353,16 @@ Correctness Coefficient & 0.093 \\
 Answer & Louis XI \\ \hline
 
 \end{tabular}
-\captionof{table}{The information for question 122925}
-%\label{table:ex_art}
-%\end{table}
-\end{minipage}\hfill
-\begin{minipage}[t]{.4\textwidth}
+\caption{The information for question 122925: Micro Error Analysis of History Question}
+\label{table:ex_history}
+\end{table}
+
+
+\begin{figure}[H]
 \centering
-\vspace{0pt}
-%\begin{figure}[H]
-\includegraphics[width=\textwidth]{history.png}
+\includegraphics[scale=0.5]{history.png}
 \caption{Breakdown of the training history category}
 \label{fig:mircoH}
-%\end{figure}
-\end{minipage}
 \end{figure}
 
 
