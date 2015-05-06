@@ -60,16 +60,23 @@ def compute_error_analysis(predicted,actual,maxDiff):
     print "All categories"
     print_dictionary(all_cat)
 
-    print "Position off"
+    #print "Position off"
     #print print_dictionary(percent_category_missed(cat_off,all_cat))
-    print "Answer off"
-    print_dictionary(percent_category_missed(cat_answer,all_cat))
+    #print "Answer off"
+    #print_dictionary(percent_category_missed(cat_answer,all_cat))
     
     print "mean squared error"
     mse_,max_bad = mse(predicted,actual)
     print mse_
     for m in max_bad[-5:]:
         print m[1][0].questionCategory
+        print m[1][0].questionText
+        print m[1][0].position
+        print "length: " + str(len(m[1][0].questionText.split()))
+        print m[1][0].id
+        print "hints: " + str(total_hints(m[1][0].questionText))
+        print m[1][1]['position']
+    
     #exit(-1)
     #print max_bad[1][0].questionCategory
     #print max_bad[1][1]
@@ -84,7 +91,25 @@ def compute_error_analysis(predicted,actual,maxDiff):
     my_dict = categories_right_wrong(actual,all_cat)
     print_dictionary(my_dict)
 
-    dict_to_csv("test.csv",my_dict)
+    #dict_to_csv("test.csv",my_dict)
+    dict_1 = percent_category_missed(cat_answer,all_cat)
+
+    #dict_to_csv("answeroff.csv",dict_1)
+
+    dict_to_csv("positionoff.csv",categories_position_off(predicted,actual,all_cat))
+
+    print "Position off"
+    for m in missedQuestions[-5:]:
+        #print m
+        print m[0]['category']
+        print m[0]['question']
+        print "length: " + str(len(m[0]['question'].split()))
+        #print m[0].id
+        print "hints: " + str(total_hints(m[0]['question']))
+        
+        print m[1]
+        print m[2]
+        print m[3]
 
 
 def dict_to_csv(fileName,my_dict):
@@ -133,11 +158,13 @@ def position_off(predicted,actual,maxDiff):
         #print
         diff = abs(abs(value['position'])-abs(actual[index].position))
         if diff > maxDiff:
-            missedQuestions.append((question_info[actual[index].questionId],diff))
+            missedQuestions.append((question_info[actual[index].questionId],
+                                    (value['position'],actual[index].position,diff),
+                                    actual[index].questionId,actual[index].id))
 #print "total questions"
 #    print len(predicted)
 #    print(len(missedQuestions))
-    ordered = sorted(missedQuestions, key=lambda pos: pos[1])
+    ordered = sorted(missedQuestions, key=lambda pos: pos[1][2])
     #print ordered[0]
     return ordered
 
@@ -224,12 +251,30 @@ def categories(wrong):
 
     return cat
 
+def categories_position_off(predicted,actual,all_cat):
+    cat={}
+    for index,value in enumerate(predicted):
+        
+        diff = abs(abs(value['position'])-abs(actual[index].position))
+        if cat.has_key(actual[index].questionCategory):
+            cat[actual[index].questionCategory]+=diff
+        else:
+            cat[actual[index].questionCategory]=diff
+
+    for k,v in cat.iteritems():
+        cat[k] = [v/all_cat[k]]
+
+    return cat
+        
+
+
+
 #Returns dictionary of categories -> percent where sign of answer doesn't match
 def percent_category_missed(wrong,total):
     percent_missed = {}
     for key,value in total.iteritems():
         if wrong.has_key(key):
-            percent_missed[key] = (wrong[key]/value)*100
+            percent_missed[key] = [(wrong[key]/value)*100]
         else:
             percent_missed[key] = 0
     return percent_missed

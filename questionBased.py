@@ -77,7 +77,7 @@ def example_correct(question,train=True):
 
     
     feat_dict = {'category': question.questionCategory,'question length': len(question.questionText.split()) ,'answer':question.questionAnswer.lower(),'hints': total_hints(question.questionText),'position':abs(question.position)}#,'word':leading_word}#,'leading2':trailing_word}
-    
+    #'answer':question.questionAnswer.lower(),
     
     
     if train:
@@ -180,6 +180,7 @@ if __name__ == '__main__':
     
     dataset = Dataset(TrainFormat(), TestFormat(), QuestionFormat())
     train, test = dataset.getTrainingTest("data/train.csv", "data/test.csv", "data/questions.csv", -1)
+    actual_test, dumb_dumb = dataset.getTrainingTest("data/TestResult.csv", "data/TestResult.csv", "data/questions.csv", -1)
     positions = [q.position for q in train]
 
     #For cross validation, change to test_size to 0.0 for learning on all the training data
@@ -220,6 +221,8 @@ if __name__ == '__main__':
 
     features_pos,position = all_examples_position(X_train,True);
     features_cor,isCorrect = all_examples_correct(X_train,True);
+    #print "IS CORRECT"
+    #print isCorrect
     train_pos = feat_pos.train_feature(features_pos)
     train_cor = feat_cor.train_feature(features_cor)
     features_position = feat_pos.get_features()
@@ -241,10 +244,7 @@ if __name__ == '__main__':
         if c > 0.0001 or c<-0.0001:
             matter_position.append([index,c])
 
-    matter_correct = []
-    for index,c in enumerate(classifier_position.coef_):
-        if c > 0.0001 or c<-0.0001:
-            matter_correct.append([index,c])
+
 
     #print classifier_position.get_params()
     y_lin = classifier_position.predict(t_test)
@@ -270,9 +270,18 @@ if __name__ == '__main__':
 
 
     classifier_correct = clf.fit(train_cor,isCorrect)
+    matter_correct = []
+
+
+    for index,c in enumerate(classifier_correct.coef_):
+        if c > 0.0001 or c<-0.0001:
+            matter_correct.append([index,c])
+
     y_cor = classifier_correct.predict(t_test_cor)
 
     predictions_lin = []
+    abs_position = []
+    correct_conf = []
     total_change = 0
     min = 10
     max = 0
@@ -314,9 +323,12 @@ if __name__ == '__main__':
             y_cor[index] = -y_cor[index]
             total_change+=1
         '''
-        predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*abs(value)})
+        predictions_lin.append({'id':X_test[index].id,'position': y_cor[index]*value})
+        abs_position.append({'id':X_test[index].id,'position': value})
+        correct_conf.append({'id':X_test[index].id,'position': y_cor[index]})
         #predictions_lin.append({'id':X_test[index].id,'position': value})
-    #compute_error_analysis(predictions_lin,store,25)
+    compute_error_analysis(predictions_lin,actual_test,25)
+    #compute_error_analysis(abs_position,actual_test,25)
 
     '''
     print "total change"
@@ -383,7 +395,7 @@ if __name__ == '__main__':
         '''
         predictions_lin_train.append({'id':X_train[index].id,'position': y_train_cor[index]*abs(value)})
         
-    compute_error_analysis(predictions_lin_train,store_train,25)
+        #compute_error_analysis(predictions_lin_train,store_train,25)
 
 
 #Feature Data
@@ -392,8 +404,16 @@ if __name__ == '__main__':
         print i[1],features_position[i[0]]
    
     print "Correct"
-    for i in matter_correct:
-        print i[1],features_correct[i[0]]
+    print "effective features correct"
+    print len(matter_correct)
+    matter_correct1 = []
+    for c in matter_correct:
+        matter_correct1.append((c[1],features_correct[c[0]]))
+    
+    mc = sorted(matter_correct1, key=lambda tup: tup[0])
+    for m in mc:
+        #if m[1][0:2] != 'an':
+        print m
 
 
     '''
@@ -406,7 +426,11 @@ if __name__ == '__main__':
 
 #Output the guesses
     fileFormat = GuessFormat()
-    fileFormat.serialize(predictions_lin, "data/guessFinalNo12.csv")
+#fileFormat.serialize(predictions_lin, "data/guessFinalNo12.csv")
+#fileFormat.serialize(abs_position, "data/guessPosition.csv")
+    fileFormat.serialize(correct_conf, "data/guessCorrectness.csv")
+
+
 
 
 
