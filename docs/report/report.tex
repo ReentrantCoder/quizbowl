@@ -35,7 +35,13 @@
 \usepackage{subfig}
 \usepackage{wrapfig}
 
-
+\usepackage{hyperref} 
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
 
 % Deal with backwards quotes because evidently Latex doesn't know better.
 \usepackage [english]{babel}
@@ -67,13 +73,24 @@
 
 \newgeometry{margin=1.125in}
 
+
 \begin{document}
 
-\title{CSCI-5622: When They Buzz}
-\author{Alex Gendreau \and Garrett Lewellen \and Tyler Behm \and a.k.a. Team Skynet}
-\date{May 7\textsuperscript{th}, 2015}
+\begin{center}
+\LARGE{CSCI-5622: When They Buzz}
+\end{center}
 
-\maketitle
+\begin{center}
+\large{$ $\hfill Alex Gendreau \hfill Garrett Lewellen \hfill Tyler Behm \hfill a.k.a. Team Skynet \hfill $ $}
+\end{center}
+
+\begin{center}
+	Project GitHub: \href{https://github.com/trekbaum/quizbowl}{https://github.com/trekbaum/quizbowl}
+\end{center}
+
+\begin{center}
+	May 7\textsuperscript{th}, 2015
+\end{center}
 
 \section{Problem}
 
